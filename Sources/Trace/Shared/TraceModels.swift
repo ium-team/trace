@@ -80,6 +80,20 @@ struct CaptureResult {
     var image: NSImage
     var pixelWidth: Int
     var pixelHeight: Int
+    var sourceURL: URL?
+
+    init(image: NSImage, sourceURL: URL? = nil) {
+        self.image = image
+        self.sourceURL = sourceURL
+
+        if let representation = image.representations.first {
+            pixelWidth = representation.pixelsWide
+            pixelHeight = representation.pixelsHigh
+        } else {
+            pixelWidth = Int(image.size.width)
+            pixelHeight = Int(image.size.height)
+        }
+    }
 }
 
 struct SavedCapture {
@@ -99,6 +113,7 @@ struct AppDestination: Identifiable, Hashable {
 
 enum TraceError: LocalizedError {
     case screenRecordingRequired
+    case captureCancelled
     case captureFailed
     case captureFailedReason(String)
     case imageEncodingFailed
@@ -111,6 +126,8 @@ enum TraceError: LocalizedError {
         switch self {
         case .screenRecordingRequired:
             "화면 캡처 권한이 필요합니다."
+        case .captureCancelled:
+            "캡처가 취소되었습니다."
         case .captureFailed:
             "선택한 영역을 캡처하지 못했습니다."
         case .captureFailedReason(let message):

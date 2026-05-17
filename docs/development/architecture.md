@@ -2,7 +2,7 @@
 
 ## 목표
 
-아키텍처 목표는 캡처, 저장, 전달, 히스토리 기능을 서로 분리해 변경 비용을 낮추는 것이다. MVP에서는 과한 추상화보다 명확한 모듈 경계를 우선한다.
+아키텍처 목표는 캡처 실행, 저장, 전달, 히스토리 기능을 서로 분리해 변경 비용을 낮추는 것이다. MVP에서는 macOS 기본 캡처 도구를 사용하고, 과한 추상화보다 명확한 모듈 경계를 우선한다.
 
 ## 상위 구조
 
@@ -34,14 +34,14 @@ TraceApp
 
 ### Capture
 
-캡처 UI와 캡처 결과 생성을 담당한다.
+macOS 기본 캡처 도구 실행과 캡처 결과 수집을 담당한다. MVP에서는 자체 영역 선택 오버레이나 커스텀 캡처 엔진을 구현하지 않는다.
 
 주요 책임:
 
-- 영역 선택 오버레이 표시
-- 드래그 영역 계산
-- 선택 영역 캡처
+- macOS 기본 영역 선택 캡처 실행
+- 캡처 완료 파일 수신
 - 캡처 취소 처리
+- 캡처 도구 실행 실패 처리
 - 캡처 결과 객체 생성
 
 ### Storage
@@ -159,7 +159,7 @@ showSaveNotification
 
 ```text
 GlobalShortcut
-  -> CaptureOverlay
+  -> SystemCaptureTool
   -> CaptureResult
   -> Storage.save
   -> Clipboard.copy
@@ -171,7 +171,7 @@ GlobalShortcut
 
 ```text
 GlobalShortcut
-  -> CaptureOverlay(deliverToApp)
+  -> SystemCaptureTool(deliverToApp)
   -> CaptureResult
   -> Storage.save
   -> Clipboard.copy
@@ -191,6 +191,7 @@ HistoryWindow
 ## 설계 원칙
 
 - Capture는 저장 위치나 히스토리 UI를 알지 않는다.
+- MVP의 Capture는 macOS 기본 캡처 도구를 감싸는 얇은 모듈로 유지한다.
 - Storage는 UI를 알지 않는다.
 - Delivery는 캡처 방식을 직접 결정하지 않고 전달 대상 선택과 전달만 담당한다.
 - History는 파일 시스템 상태와 메타데이터를 읽어 표시한다.

@@ -5,7 +5,7 @@ import SwiftUI
 final class AppController {
     private let settingsStore = SettingsStore()
     private lazy var storage = CaptureStorage(settingsStore: settingsStore)
-    private let overlayController = CaptureOverlayController()
+    private let captureController = SystemCaptureController()
     private let deliveryService = DeliveryService()
     private let hotKeyManager = HotKeyManager()
 
@@ -81,7 +81,7 @@ final class AppController {
             return
         }
 
-        overlayController.start { [weak self] result in
+        captureController.start { [weak self] result in
             Task { @MainActor in
                 await self?.handleCaptureResult(result, mode: captureMode)
             }
@@ -91,8 +91,13 @@ final class AppController {
     private func handleCaptureResult(_ result: Result<CaptureResult, Error>, mode: CaptureMode) async {
         switch result {
         case .success(let capture):
+            defer {
+                if let sourceURL = capture.sourceURL {
+                    try? FileManager.default.removeItem(at: sourceURL)
+                }
+            }
             do {
-                let saved = try storage.save(image: capture.image, mode: mode)
+                let saved = try storage.save(capture: capture, mode: mode)
                 try ClipboardService.copy(image: capture.image)
                 TraceNotificationCenter.showSaved(
                     fileURL: saved.fileURL,
@@ -109,6 +114,9 @@ final class AppController {
                 showError(error.localizedDescription)
             }
         case .failure(let error):
+            if case TraceError.captureCancelled = error {
+                return
+            }
             showError(error.localizedDescription)
         }
     }

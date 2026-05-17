@@ -32,6 +32,26 @@ final class CaptureStorage {
     }
 
     func save(image: NSImage, mode: CaptureMode, date: Date = Date()) throws -> SavedCapture {
+        try save(image: image, pixelWidth: Int(image.size.width), pixelHeight: Int(image.size.height), mode: mode, date: date)
+    }
+
+    func save(capture: CaptureResult, mode: CaptureMode, date: Date = Date()) throws -> SavedCapture {
+        try save(
+            image: capture.image,
+            pixelWidth: capture.pixelWidth,
+            pixelHeight: capture.pixelHeight,
+            mode: mode,
+            date: date
+        )
+    }
+
+    private func save(
+        image: NSImage,
+        pixelWidth: Int,
+        pixelHeight: Int,
+        mode: CaptureMode,
+        date: Date
+    ) throws -> SavedCapture {
         let rootURL = settingsStore.rootURL
         let folderName = TraceDateFormatters.folder.string(from: date)
         let capturesDirectory = rootURL.appendingPathComponent("captures").appendingPathComponent(folderName)
@@ -63,8 +83,8 @@ final class CaptureStorage {
             filePath: imageURL.relativePath(from: rootURL),
             thumbnailPath: thumbnailURL?.relativePath(from: rootURL),
             createdAt: date,
-            width: Int(image.size.width),
-            height: Int(image.size.height),
+            width: pixelWidth,
+            height: pixelHeight,
             captureMode: mode,
             deliveredAppName: nil,
             deliveryState: mode == .copyOnly ? .none : .skipped
