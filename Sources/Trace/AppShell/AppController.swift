@@ -5,7 +5,7 @@ import SwiftUI
 final class AppController {
     private let settingsStore = SettingsStore()
     private lazy var storage = CaptureStorage(settingsStore: settingsStore)
-    private let captureController = SystemCaptureController()
+    private let captureController = CaptureOverlayController()
     private let deliveryService = DeliveryService()
     private let hotKeyManager = HotKeyManager()
 
@@ -91,11 +91,6 @@ final class AppController {
     private func handleCaptureResult(_ result: Result<CaptureResult, Error>, mode: CaptureMode) async {
         switch result {
         case .success(let capture):
-            defer {
-                if let sourceURL = capture.sourceURL {
-                    try? FileManager.default.removeItem(at: sourceURL)
-                }
-            }
             do {
                 let saved = try storage.save(capture: capture, mode: mode)
                 try ClipboardService.copy(image: capture.image)

@@ -80,11 +80,9 @@ struct CaptureResult {
     var image: NSImage
     var pixelWidth: Int
     var pixelHeight: Int
-    var sourceURL: URL?
 
-    init(image: NSImage, sourceURL: URL? = nil) {
+    init(image: NSImage) {
         self.image = image
-        self.sourceURL = sourceURL
 
         if let representation = image.representations.first {
             pixelWidth = representation.pixelsWide
