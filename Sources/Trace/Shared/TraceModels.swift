@@ -100,6 +100,7 @@ struct AppDestination: Identifiable, Hashable {
 enum TraceError: LocalizedError {
     case screenRecordingRequired
     case captureFailed
+    case captureFailedReason(String)
     case imageEncodingFailed
     case pasteboardFailed
     case accessibilityRequired
@@ -112,6 +113,8 @@ enum TraceError: LocalizedError {
             "화면 캡처 권한이 필요합니다."
         case .captureFailed:
             "선택한 영역을 캡처하지 못했습니다."
+        case .captureFailedReason(let message):
+            message
         case .imageEncodingFailed:
             "이미지를 PNG로 변환하지 못했습니다."
         case .pasteboardFailed:

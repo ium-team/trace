@@ -108,8 +108,8 @@ final class AppController {
             } catch {
                 showError(error.localizedDescription)
             }
-        case .failure:
-            showError("캡처하지 못했습니다. 영역을 너무 작게 선택했거나 화면 이미지 생성에 실패했습니다.")
+        case .failure(let error):
+            showError(error.localizedDescription)
         }
     }
 
