@@ -91,20 +91,7 @@ final class AppController {
     func startCapture(mode: CaptureMode? = nil, scope: CaptureScope = .area) {
         let captureMode = mode ?? settingsStore.settings.defaultCaptureMode
         guard PermissionService.hasScreenRecordingPermission else {
-            if !PermissionService.hasRequestedScreenRecordingPermission {
-                PermissionService.requestScreenRecordingPermissionIfNeeded()
-                return
-            }
-
-            showPermissionAlert(
-                message: "화면 캡처 권한이 필요합니다.",
-                info: """
-                시스템 설정에서 아래 앱에 화면 기록 권한을 허용한 뒤 Trace를 완전히 종료하고 다시 실행하세요.
-
-                \(PermissionService.currentAppIdentityDescription)
-                """,
-                openAction: PermissionService.openScreenRecordingSettings
-            )
+            PermissionService.requestScreenRecordingPermission()
             return
         }
 

@@ -4,8 +4,6 @@ import CoreGraphics
 import Foundation
 
 enum PermissionService {
-    private static let screenRecordingRequestKey = "trace.screenRecordingPermissionRequested"
-
     static var currentAppIdentityDescription: String {
         let bundleIdentifier = Bundle.main.bundleIdentifier ?? "번들 ID 없음"
         let bundlePath = Bundle.main.bundleURL.path
@@ -22,13 +20,7 @@ enum PermissionService {
         CGPreflightScreenCaptureAccess()
     }
 
-    static var hasRequestedScreenRecordingPermission: Bool {
-        UserDefaults.standard.bool(forKey: screenRecordingRequestKey)
-    }
-
-    static func requestScreenRecordingPermissionIfNeeded() {
-        guard !hasRequestedScreenRecordingPermission else { return }
-        UserDefaults.standard.set(true, forKey: screenRecordingRequestKey)
+    static func requestScreenRecordingPermission() {
         _ = CGRequestScreenCaptureAccess()
     }
 
