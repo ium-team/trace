@@ -46,7 +46,7 @@ final class CaptureOverlayController {
             window.contentView = view
 
             view.onComplete = { [weak self] selection in
-                self?.finish(selection: selection, screen: screen)
+                self?.finish(selection: selection, screen: screen, overlayBounds: view.bounds)
             }
             view.onCancel = { [weak self] in
                 self?.cancel()
@@ -75,7 +75,7 @@ final class CaptureOverlayController {
         return CaptureResult(image: image)
     }
 
-    private func finish(selection: CGRect, screen: NSScreen) {
+    private func finish(selection: CGRect, screen: NSScreen, overlayBounds: CGRect) {
         guard !isFinishing else { return }
         isFinishing = true
 
@@ -99,7 +99,7 @@ final class CaptureOverlayController {
             }
 
             do {
-                let image = try self.capture(selection: selection, on: screen)
+                let image = try self.capture(selection: selection, overlayBounds: overlayBounds, on: screen)
                 activeCompletion?(.success(CaptureResult(image: image)))
             } catch {
                 activeCompletion?(.failure(error))
@@ -136,25 +136,25 @@ final class CaptureOverlayController {
         }
     }
 
-    private func capture(selection: CGRect, on screen: NSScreen) throws -> NSImage {
+    private func capture(selection: CGRect, overlayBounds: CGRect, on screen: NSScreen) throws -> NSImage {
         guard let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
             throw TraceError.captureFailedReason("디스플레이 정보를 읽지 못했습니다.")
         }
 
         let displayID = CGDirectDisplayID(screenNumber.uint32Value)
-        let scale = screen.backingScaleFactor
+        let displayBounds = CGDisplayBounds(displayID)
+        guard overlayBounds.width > 0, overlayBounds.height > 0, displayBounds.width > 0, displayBounds.height > 0 else {
+            throw TraceError.captureFailedReason("캡처 영역 좌표를 계산하지 못했습니다.")
+        }
+
+        let scaleX = displayBounds.width / overlayBounds.width
+        let scaleY = displayBounds.height / overlayBounds.height
         let rawPixelRect = CGRect(
-            x: selection.minX * scale,
-            y: (screen.frame.height - selection.maxY) * scale,
-            width: selection.width * scale,
-            height: selection.height * scale
+            x: displayBounds.minX + selection.minX * scaleX,
+            y: displayBounds.minY + (overlayBounds.height - selection.maxY) * scaleY,
+            width: selection.width * scaleX,
+            height: selection.height * scaleY
         ).integral
-        let displayBounds = CGRect(
-            x: 0,
-            y: 0,
-            width: CGFloat(CGDisplayPixelsWide(displayID)),
-            height: CGFloat(CGDisplayPixelsHigh(displayID))
-        )
         let pixelRect = rawPixelRect.intersection(displayBounds).integral
 
         guard pixelRect.width >= 8, pixelRect.height >= 8, !pixelRect.isNull else {
