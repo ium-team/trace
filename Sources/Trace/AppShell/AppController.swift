@@ -10,6 +10,7 @@ final class AppController {
     private let hotKeyManager = HotKeyManager()
 
     private var statusItem: NSStatusItem?
+    private var captureLauncherWindow: NSWindow?
     private var historyWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var destinationWindow: NSWindow?
@@ -30,8 +31,7 @@ final class AppController {
 
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "캡처 시작", action: #selector(startCopyCaptureFromMenu), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "앱으로 전달 캡처", action: #selector(startDeliveryCaptureFromMenu), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "캡처 시작", action: #selector(openCaptureLauncherFromMenu), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "히스토리 열기", action: #selector(openHistoryFromMenu), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "설정 열기", action: #selector(openSettingsFromMenu), keyEquivalent: ""))
@@ -43,18 +43,15 @@ final class AppController {
 
     private func registerHotKeys() {
         hotKeyManager.register(copyAction: { [weak self] in
-            Task { @MainActor in self?.startCapture(mode: .copyOnly) }
+            Task { @MainActor in self?.openCaptureLauncher(defaultPlan: .areaCopy) }
         }, deliverAction: { [weak self] in
-            Task { @MainActor in self?.startCapture(mode: .deliverToApp) }
+            Task { @MainActor in self?.openCaptureLauncher(defaultPlan: .areaDelivery) }
         })
     }
 
-    @objc private func startCopyCaptureFromMenu() {
-        startCapture(mode: .copyOnly)
-    }
-
-    @objc private func startDeliveryCaptureFromMenu() {
-        startCapture(mode: .deliverToApp)
+    @objc private func openCaptureLauncherFromMenu() {
+        let defaultPlan = settingsStore.settings.defaultCaptureMode == .deliverToApp ? CapturePlan.areaDelivery : .areaCopy
+        openCaptureLauncher(defaultPlan: defaultPlan)
     }
 
     @objc private func openHistoryFromMenu() {
@@ -65,10 +62,40 @@ final class AppController {
         openSettings()
     }
 
-    func startCapture(mode: CaptureMode? = nil) {
+    private func openCaptureLauncher(defaultPlan: CapturePlan) {
+        let view = CaptureLauncherView(
+            defaultPlan: defaultPlan,
+            onCancel: { [weak self] in
+                self?.captureLauncherWindow?.close()
+                self?.captureLauncherWindow = nil
+            },
+            onCapture: { [weak self] plan in
+                self?.captureLauncherWindow?.close()
+                self?.captureLauncherWindow = nil
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                    self?.startCapture(mode: plan.mode, scope: plan.scope)
+                }
+            }
+        )
+
+        if captureLauncherWindow == nil {
+            captureLauncherWindow = makeWindow(title: "Trace 캡처", size: NSSize(width: 600, height: 390), rootView: view)
+        } else {
+            captureLauncherWindow?.contentViewController = NSHostingController(rootView: view)
+        }
+        captureLauncherWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func startCapture(mode: CaptureMode? = nil, scope: CaptureScope = .area) {
         let captureMode = mode ?? settingsStore.settings.defaultCaptureMode
         guard PermissionService.hasScreenRecordingPermission else {
-            PermissionService.requestScreenRecordingPermission()
+            if !PermissionService.hasRequestedScreenRecordingPermission {
+                PermissionService.requestScreenRecordingPermissionIfNeeded()
+                return
+            }
+
             showPermissionAlert(
                 message: "화면 캡처 권한이 필요합니다.",
                 info: """
@@ -78,6 +105,20 @@ final class AppController {
                 """,
                 openAction: PermissionService.openScreenRecordingSettings
             )
+            return
+        }
+
+        if scope == .fullScreen {
+            do {
+                let capture = try captureController.captureFullScreen()
+                Task { @MainActor in
+                    await handleCaptureResult(.success(capture), mode: captureMode)
+                }
+            } catch {
+                Task { @MainActor in
+                    await handleCaptureResult(.failure(error), mode: captureMode)
+                }
+            }
             return
         }
 
@@ -189,6 +230,7 @@ final class AppController {
             defer: false
         )
         window.title = title
+        window.isReleasedWhenClosed = false
         window.center()
         window.contentViewController = NSHostingController(rootView: rootView)
         return window

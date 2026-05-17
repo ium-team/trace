@@ -59,6 +59,22 @@ final class CaptureOverlayController {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    func captureFullScreen() throws -> CaptureResult {
+        guard let screen = NSScreen.main ?? NSScreen.screens.first,
+              let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        else {
+            throw TraceError.captureFailedReason("디스플레이 정보를 읽지 못했습니다.")
+        }
+
+        let displayID = CGDirectDisplayID(screenNumber.uint32Value)
+        guard let cgImage = CGDisplayCreateImage(displayID) else {
+            throw TraceError.captureFailedReason("CoreGraphics가 전체 화면 이미지를 만들지 못했습니다. 화면 기록 권한을 다시 확인하세요.")
+        }
+
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        return CaptureResult(image: image)
+    }
+
     private func finish(selection: CGRect, screen: NSScreen) {
         guard !isFinishing else { return }
         isFinishing = true

@@ -17,6 +17,80 @@ enum CaptureMode: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum CaptureScope: String, CaseIterable, Identifiable {
+    case area
+    case fullScreen
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .area:
+            "영역"
+        case .fullScreen:
+            "전체 화면"
+        }
+    }
+}
+
+struct CapturePlan: Identifiable, Hashable {
+    var mode: CaptureMode
+    var scope: CaptureScope
+
+    var id: String { "\(scope.rawValue)-\(mode.rawValue)" }
+
+    var title: String {
+        switch (scope, mode) {
+        case (.area, .copyOnly):
+            "영역 캡처"
+        case (.fullScreen, .copyOnly):
+            "전체 화면 캡처"
+        case (.area, .deliverToApp):
+            "영역 캡처 후 앱으로 전달"
+        case (.fullScreen, .deliverToApp):
+            "전체 화면 캡처 후 앱으로 전달"
+        }
+    }
+
+    var description: String {
+        switch (scope, mode) {
+        case (.area, .copyOnly):
+            "드래그한 영역을 저장하고 클립보드에 복사합니다."
+        case (.fullScreen, .copyOnly):
+            "주 디스플레이 전체를 저장하고 클립보드에 복사합니다."
+        case (.area, .deliverToApp):
+            "드래그한 영역을 저장한 뒤 전달할 앱을 선택합니다."
+        case (.fullScreen, .deliverToApp):
+            "주 디스플레이 전체를 저장한 뒤 전달할 앱을 선택합니다."
+        }
+    }
+
+    var symbolName: String {
+        switch (scope, mode) {
+        case (.area, .copyOnly):
+            "crop"
+        case (.fullScreen, .copyOnly):
+            "rectangle.inset.filled"
+        case (.area, .deliverToApp):
+            "arrow.up.right.square"
+        case (.fullScreen, .deliverToApp):
+            "rectangle.portrait.and.arrow.right"
+        }
+    }
+
+    static let areaCopy = CapturePlan(mode: .copyOnly, scope: .area)
+    static let fullScreenCopy = CapturePlan(mode: .copyOnly, scope: .fullScreen)
+    static let areaDelivery = CapturePlan(mode: .deliverToApp, scope: .area)
+    static let fullScreenDelivery = CapturePlan(mode: .deliverToApp, scope: .fullScreen)
+
+    static let all: [CapturePlan] = [
+        .areaCopy,
+        .fullScreenCopy,
+        .areaDelivery,
+        .fullScreenDelivery
+    ]
+}
+
 enum DeliveryState: String, Codable, CaseIterable {
     case none
     case skipped

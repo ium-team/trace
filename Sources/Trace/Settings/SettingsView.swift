@@ -31,7 +31,7 @@ struct SettingsView: View {
                 }
                 TextField("전역 단축키", text: $draft.globalShortcut)
                     .disabled(true)
-                Text("현재 단축키: 복사만 하기 command+shift+2, 앱으로 전달 command+shift+3")
+                Text("현재 단축키: command+shift+2, command+shift+3. 단축키를 누르면 캡처 방식 선택 화면이 열립니다.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

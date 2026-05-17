@@ -41,6 +41,7 @@ TraceApp
 - 영역 선택 오버레이 표시
 - 드래그 영역 계산
 - 선택 영역 캡처
+- 전체 화면 캡처
 - 캡처 취소 처리
 - 캡처 결과 객체 생성
 
@@ -159,7 +160,8 @@ showSaveNotification
 
 ```text
 GlobalShortcut
-  -> CaptureOverlay
+  -> CaptureLauncher
+  -> Capture(area overlay or full screen)
   -> CaptureResult
   -> Storage.save
   -> Clipboard.copy
@@ -171,7 +173,8 @@ GlobalShortcut
 
 ```text
 GlobalShortcut
-  -> CaptureOverlay(deliverToApp)
+  -> CaptureLauncher
+  -> Capture(area overlay or full screen, deliverToApp)
   -> CaptureResult
   -> Storage.save
   -> Clipboard.copy
