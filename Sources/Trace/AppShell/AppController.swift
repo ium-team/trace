@@ -91,10 +91,18 @@ final class AppController {
     func startCapture(mode: CaptureMode? = nil, scope: CaptureScope = .area) {
         let captureMode = mode ?? settingsStore.settings.defaultCaptureMode
         guard PermissionService.hasScreenRecordingPermission else {
-            PermissionService.requestScreenRecordingPermission()
+            guard PermissionService.requestScreenRecordingPermission() else {
+                return
+            }
+
+            performCapture(mode: captureMode, scope: scope)
             return
         }
 
+        performCapture(mode: captureMode, scope: scope)
+    }
+
+    private func performCapture(mode captureMode: CaptureMode, scope: CaptureScope) {
         if scope == .fullScreen {
             do {
                 let capture = try captureController.captureFullScreen()

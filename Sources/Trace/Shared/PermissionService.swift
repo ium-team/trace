@@ -20,8 +20,8 @@ enum PermissionService {
         CGPreflightScreenCaptureAccess()
     }
 
-    static func requestScreenRecordingPermission() {
-        _ = CGRequestScreenCaptureAccess()
+    static func requestScreenRecordingPermission() -> Bool {
+        CGRequestScreenCaptureAccess()
     }
 
     static var hasAccessibilityPermission: Bool {
