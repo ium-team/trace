@@ -4,6 +4,18 @@ import CoreGraphics
 import Foundation
 
 enum PermissionService {
+    static var currentAppIdentityDescription: String {
+        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "번들 ID 없음"
+        let bundlePath = Bundle.main.bundleURL.path
+        let executablePath = Bundle.main.executableURL?.path ?? "실행 파일 경로 없음"
+        return """
+        현재 실행 중인 앱:
+        번들 ID: \(bundleIdentifier)
+        앱 경로: \(bundlePath)
+        실행 파일: \(executablePath)
+        """
+    }
+
     static var hasScreenRecordingPermission: Bool {
         CGPreflightScreenCaptureAccess()
     }

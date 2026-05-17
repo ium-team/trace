@@ -58,3 +58,12 @@ open build/Trace.app
 - 앱으로 자동 전달 캡처: `command+shift+3`
 
 화면 캡처 권한은 실제 실행 주체에 부여해야 한다. `swift run Trace`로 실행하면 터미널 앱에 Screen Recording 권한이 필요하고, `build/Trace.app`으로 실행하면 Trace 앱에 권한이 필요하다. 앱으로 자동 전달을 사용하려면 Accessibility 권한도 허용해야 한다.
+
+권한을 허용했는데도 계속 다시 묻는 경우:
+
+```bash
+scripts/build-app.sh
+open build/Trace.app
+```
+
+`swift run Trace`와 `open build/Trace.app`을 번갈아 쓰면 macOS가 서로 다른 앱으로 권한을 관리한다. 권한 테스트는 `build/Trace.app` 하나로만 진행하는 것이 좋다. 이미 꼬였다면 시스템 설정의 Screen Recording, Accessibility 목록에서 기존 Trace 항목을 제거한 뒤 `build/Trace.app`을 다시 열어 권한을 새로 허용한다.

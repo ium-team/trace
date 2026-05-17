@@ -71,7 +71,11 @@ final class AppController {
             PermissionService.requestScreenRecordingPermission()
             showPermissionAlert(
                 message: "화면 캡처 권한이 필요합니다.",
-                info: "시스템 설정에서 Trace 또는 실행 중인 터미널 앱에 화면 기록 권한을 허용한 뒤 앱을 다시 실행하세요.",
+                info: """
+                시스템 설정에서 아래 앱에 화면 기록 권한을 허용한 뒤 Trace를 완전히 종료하고 다시 실행하세요.
+
+                \(PermissionService.currentAppIdentityDescription)
+                """,
                 openAction: PermissionService.openScreenRecordingSettings
             )
             return
@@ -105,7 +109,7 @@ final class AppController {
                 showError(error.localizedDescription)
             }
         case .failure:
-            break
+            showError("캡처하지 못했습니다. 영역을 너무 작게 선택했거나 화면 이미지 생성에 실패했습니다.")
         }
     }
 

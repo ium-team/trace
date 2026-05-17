@@ -6,8 +6,13 @@ import Foundation
 final class CaptureOverlayController {
     private var windows: [CaptureOverlayWindow] = []
     private var completion: ((Result<CaptureResult, Error>) -> Void)?
+    private var isFinishing = false
+    private var generation = 0
 
     func start(completion: @escaping (Result<CaptureResult, Error>) -> Void) {
+        cancelActiveOverlay()
+        generation += 1
+        isFinishing = false
         self.completion = completion
         windows = NSScreen.screens.map { screen in
             let window = CaptureOverlayWindow(screen: screen)
@@ -25,37 +30,64 @@ final class CaptureOverlayController {
     }
 
     private func finish(selection: CGRect, screen: NSScreen) {
-        closeWindows()
-        guard selection.width >= 8, selection.height >= 8 else {
-            completion?(.failure(TraceError.captureFailed))
-            completion = nil
-            return
-        }
+        guard !isFinishing else { return }
+        isFinishing = true
 
-        guard let image = capture(selection: selection, on: screen) else {
-            completion?(.failure(TraceError.captureFailed))
-            completion = nil
-            return
-        }
+        let activeWindows = hideWindowsForDeferredClose()
+        let activeCompletion = completion
+        let activeGeneration = generation
 
-        completion?(.success(CaptureResult(image: image, pixelWidth: Int(image.size.width), pixelHeight: Int(image.size.height))))
-        completion = nil
+        Task { @MainActor [weak self, activeWindows] in
+            await Task.yield()
+            defer {
+                activeWindows.forEach { $0.close() }
+                if self?.generation == activeGeneration {
+                    self?.completion = nil
+                    self?.isFinishing = false
+                }
+            }
+
+            guard let self else { return }
+            guard selection.width >= 8, selection.height >= 8 else {
+                activeCompletion?(.failure(TraceError.captureFailed))
+                return
+            }
+
+            guard let image = capture(selection: selection, on: screen) else {
+                activeCompletion?(.failure(TraceError.captureFailed))
+                return
+            }
+
+            activeCompletion?(.success(CaptureResult(image: image, pixelWidth: Int(image.size.width), pixelHeight: Int(image.size.height))))
+        }
     }
 
     private func cancel() {
-        closeWindows()
+        cancelActiveOverlay()
         completion = nil
     }
 
-    private func closeWindows() {
-        windows.forEach { $0.close() }
+    private func cancelActiveOverlay() {
+        guard !windows.isEmpty else { return }
+        let activeWindows = hideWindowsForDeferredClose()
+        Task { @MainActor [activeWindows] in
+            await Task.yield()
+            activeWindows.forEach { $0.close() }
+        }
+    }
+
+    private func hideWindowsForDeferredClose() -> [CaptureOverlayWindow] {
+        let activeWindows = windows
+        activeWindows.forEach { $0.orderOut(nil) }
         windows.removeAll()
+        return activeWindows
     }
 
     private func capture(selection: CGRect, on screen: NSScreen) -> NSImage? {
-        guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
+        guard let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
             return nil
         }
+        let displayID = CGDirectDisplayID(screenNumber.uint32Value)
 
         let scale = screen.backingScaleFactor
         let pixelRect = CGRect(
@@ -73,8 +105,8 @@ final class CaptureOverlayController {
 }
 
 final class CaptureOverlayWindow: NSWindow {
-    let traceScreen: NSScreen
-    let overlayView: CaptureOverlayView
+    private(set) var traceScreen: NSScreen!
+    private(set) var overlayView: CaptureOverlayView!
 
     init(screen: NSScreen) {
         self.traceScreen = screen
@@ -83,8 +115,7 @@ final class CaptureOverlayWindow: NSWindow {
             contentRect: screen.frame,
             styleMask: [.borderless],
             backing: .buffered,
-            defer: false,
-            screen: screen
+            defer: false
         )
         level = .screenSaver
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
@@ -145,6 +176,9 @@ final class CaptureOverlayView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        guard dragStart != nil else {
+            return
+        }
         dragCurrent = event.locationInWindow
         guard let rect = selectionRect else {
             onCancel?()
