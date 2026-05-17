@@ -11,7 +11,8 @@ Codex는 구현 전에 다음 문서를 확인한다.
 1. `docs/mvp-spec.md`
 2. `docs/development/architecture.md`
 3. `docs/development/feature-specs.md`
-4. 관련 구현 파일
+4. 권한 또는 자동 전달 작업이면 `docs/development/permissions.md`, `docs/development/delivery.md`
+5. 관련 구현 파일
 
 ## 작업 단위
 
@@ -65,4 +66,3 @@ Codex는 `docs/development/implementation-plan.md`의 순서를 따른다. 단, 
 - 제품 문서와 개발 문서가 충돌하지 않는지 확인한다.
 - 테스트 또는 빌드 결과를 확인한다.
 - 커밋 메시지는 변경 내용을 짧고 명확하게 쓴다.
-
