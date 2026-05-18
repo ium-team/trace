@@ -20,7 +20,7 @@ struct SettingsView: View {
                         Label("선택", systemImage: "folder")
                     }
                 }
-                Toggle("저장 완료 알림 표시", isOn: $draft.showSaveNotification)
+                Toggle("알림센터 알림 표시", isOn: $draft.showSaveNotification)
             }
 
             Section("캡처") {
@@ -53,6 +53,7 @@ struct SettingsView: View {
                 Spacer()
                 Button("저장") {
                     settingsStore.update(draft)
+                    TraceNotificationCenter.requestIfNeeded(enabled: draft.showSaveNotification)
                 }
                 .keyboardShortcut(.defaultAction)
             }

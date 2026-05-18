@@ -16,7 +16,7 @@ final class AppController {
 
     func start() {
         settingsStore.save()
-        TraceNotificationCenter.requestIfNeeded()
+        TraceNotificationCenter.requestIfNeeded(enabled: settingsStore.settings.showSaveNotification)
         configureStatusItem()
         registerHotKeys()
     }
@@ -186,7 +186,8 @@ final class AppController {
             } else {
                 TraceNotificationCenter.showDeliveryFailed(
                     appName: destination.name,
-                    message: error.localizedDescription
+                    message: error.localizedDescription,
+                    enabled: settingsStore.settings.showSaveNotification
                 )
             }
             openHistory()
@@ -267,6 +268,6 @@ final class AppController {
         alert.messageText = "Trace 오류"
         alert.informativeText = message
         alert.runModal()
-        TraceNotificationCenter.showFailure(message)
+        TraceNotificationCenter.showFailure(message, enabled: settingsStore.settings.showSaveNotification)
     }
 }
