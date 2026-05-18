@@ -15,6 +15,16 @@ final class TraceNotificationCenter: NSObject, UNUserNotificationCenterDelegate 
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
+    static func requestAuthorization() async -> Bool {
+        configure()
+        do {
+            return try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        } catch {
+            NSLog("Trace notification authorization request failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+
     static func showSaved(fileURL: URL, folderName: String, enabled: Bool) {
         guard enabled else { return }
         post(title: "캡처 저장 완료", body: "\(folderName) 폴더에 저장됨")

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UserNotifications
 
@@ -5,6 +6,8 @@ struct SettingsView: View {
     @Bindable var settingsStore: SettingsStore
     @State private var draft: TraceSettings
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var isReconcilingNotificationPreference = false
+    @State private var shouldEnableNotificationsAfterSystemApproval = false
 
     init(settingsStore: SettingsStore) {
         self.settingsStore = settingsStore
@@ -23,6 +26,7 @@ struct SettingsView: View {
                     }
                 }
                 Toggle("알림센터 알림 표시", isOn: $draft.showSaveNotification)
+                notificationPreferenceMessage
             }
 
             Section("캡처") {
@@ -51,8 +55,8 @@ struct SettingsView: View {
                 )
                 PermissionRow(
                     title: "Notifications",
-                    granted: notificationStatus == .authorized || notificationStatus == .provisional,
-                    action: PermissionService.openNotificationSettings
+                    granted: canPostNotifications,
+                    action: openNotificationSettings
                 )
             }
 
@@ -73,6 +77,19 @@ struct SettingsView: View {
         }
         .task {
             await refreshNotificationStatus()
+            reconcileNotificationPreferenceWithSystem()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task {
+                await refreshNotificationStatus()
+                reconcileNotificationPreferenceWithSystem()
+            }
+        }
+        .onChange(of: draft.showSaveNotification) { _, enabled in
+            guard !isReconcilingNotificationPreference else { return }
+            Task {
+                await handleNotificationPreferenceChange(enabled: enabled)
+            }
         }
     }
 
@@ -91,6 +108,81 @@ struct SettingsView: View {
     private func refreshNotificationStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         notificationStatus = settings.authorizationStatus
+    }
+
+    private var canPostNotifications: Bool {
+        notificationStatus == .authorized || notificationStatus == .provisional
+    }
+
+    @ViewBuilder
+    private var notificationPreferenceMessage: some View {
+        switch notificationStatus {
+        case .denied:
+            Text("macOS 시스템 설정에서 Trace 알림이 꺼져 있습니다. 여기서 켜려면 먼저 시스템 설정에서 허용해야 합니다.")
+                .font(.caption)
+                .foregroundStyle(.orange)
+        case .notDetermined where draft.showSaveNotification:
+            Text("저장하면 macOS 알림 권한을 요청합니다.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func handleNotificationPreferenceChange(enabled: Bool) async {
+        await refreshNotificationStatus()
+
+        guard enabled else {
+            shouldEnableNotificationsAfterSystemApproval = false
+            return
+        }
+
+        switch notificationStatus {
+        case .notDetermined:
+            _ = await TraceNotificationCenter.requestAuthorization()
+            await refreshNotificationStatus()
+            if !canPostNotifications {
+                forceNotificationPreferenceOff()
+            }
+        case .denied:
+            shouldEnableNotificationsAfterSystemApproval = true
+            forceNotificationPreferenceOff()
+            PermissionService.openNotificationSettings()
+        case .authorized, .provisional:
+            break
+        case .ephemeral:
+            forceNotificationPreferenceOff()
+        @unknown default:
+            forceNotificationPreferenceOff()
+        }
+    }
+
+    private func reconcileNotificationPreferenceWithSystem() {
+        if shouldEnableNotificationsAfterSystemApproval, canPostNotifications {
+            shouldEnableNotificationsAfterSystemApproval = false
+            isReconcilingNotificationPreference = true
+            draft.showSaveNotification = true
+            isReconcilingNotificationPreference = false
+            return
+        }
+
+        guard draft.showSaveNotification, notificationStatus == .denied else { return }
+        forceNotificationPreferenceOff()
+    }
+
+    private func forceNotificationPreferenceOff() {
+        isReconcilingNotificationPreference = true
+        draft.showSaveNotification = false
+        isReconcilingNotificationPreference = false
+    }
+
+    private func openNotificationSettings() {
+        PermissionService.openNotificationSettings()
+        Task {
+            await refreshNotificationStatus()
+            reconcileNotificationPreferenceWithSystem()
+        }
     }
 }
 
