@@ -16,6 +16,9 @@ final class AppController {
 
     func start() {
         settingsStore.save()
+        settingsStore.onUpdate = { [weak self] _ in
+            self?.registerHotKeys()
+        }
         TraceNotificationCenter.configure()
         TraceNotificationCenter.requestIfNeeded(enabled: true)
         configureStatusItem()
@@ -59,11 +62,16 @@ final class AppController {
     }
 
     private func registerHotKeys() {
-        hotKeyManager.register(copyAction: { [weak self] in
-            Task { @MainActor in self?.startInteractiveCapture(defaultPlan: .areaCopy) }
-        }, deliverAction: { [weak self] in
-            Task { @MainActor in self?.startInteractiveCapture(defaultPlan: .areaDelivery) }
-        })
+        hotKeyManager.register(
+            copyShortcut: settingsStore.settings.basicCaptureShortcut,
+            deliveryShortcut: settingsStore.settings.deliveryCaptureShortcut,
+            copyAction: { [weak self] in
+                Task { @MainActor in self?.startInteractiveCapture(defaultPlan: .areaCopy) }
+            },
+            deliverAction: { [weak self] in
+                Task { @MainActor in self?.startInteractiveCapture(defaultPlan: .areaDelivery) }
+            }
+        )
     }
 
     @objc private func startCaptureFromMenu() {
@@ -139,21 +147,19 @@ final class AppController {
         switch result {
         case .success(let capture):
             do {
-                let saved = try storage.save(capture: capture, mode: mode)
                 try ClipboardService.copy(image: capture.image)
-                TraceNotificationCenter.showSaved(
-                    fileURL: saved.fileURL,
-                    folderName: TraceDateFormatters.folder.string(from: saved.item.createdAt),
-                    enabled: true
-                )
+
+                let saved = try saveIfNeeded(capture: capture, mode: mode)
 
                 if mode == .deliverToApp {
                     guard prepareAccessibilityForDelivery(saved: saved) else {
                         return
                     }
                     presentDestinationPicker(for: saved)
-                } else {
+                } else if saved != nil {
                     openHistory()
+                } else {
+                    TraceNotificationCenter.showCopied(enabled: true)
                 }
             } catch {
                 showError(error.localizedDescription)
@@ -166,14 +172,39 @@ final class AppController {
         }
     }
 
-    private func presentDestinationPicker(for saved: SavedCapture) {
+    private func saveIfNeeded(capture: CaptureResult, mode: CaptureMode) throws -> SavedCapture? {
+        let shouldSave = switch mode {
+        case .copyOnly:
+            settingsStore.settings.basicCaptureAction == .copyAndSave
+        case .deliverToApp:
+            settingsStore.settings.deliveryCaptureAction == .copySaveAndDeliver
+        }
+
+        guard shouldSave else {
+            return nil
+        }
+
+        let saved = try storage.save(capture: capture, mode: mode)
+        TraceNotificationCenter.showSaved(
+            fileURL: saved.fileURL,
+            folderName: TraceDateFormatters.folder.string(from: saved.item.createdAt),
+            enabled: true
+        )
+        return saved
+    }
+
+    private func presentDestinationPicker(for saved: SavedCapture?) {
         let destinations = deliveryService.runningApps()
         let view = DestinationPickerView(
             destinations: destinations,
             onSkip: { [weak self] in
-                self?.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .skipped)
+                if let saved {
+                    self?.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .skipped)
+                }
                 self?.destinationWindow?.close()
-                self?.openHistory()
+                if saved != nil {
+                    self?.openHistory()
+                }
             },
             onSelect: { [weak self] destination in
                 Task { @MainActor in
@@ -186,7 +217,7 @@ final class AppController {
         showWindow(destinationWindow, minimumSize: NSSize(width: 420, height: 520))
     }
 
-    private func presentWindowPicker(for saved: SavedCapture, destination: AppDestination) async {
+    private func presentWindowPicker(for saved: SavedCapture?, destination: AppDestination) async {
         let windows = await deliveryService.windows(for: destination)
         let appSpecificDestinations = deliveryService.appSpecificDestinations(for: destination)
         let view = WindowPickerView(
@@ -197,9 +228,13 @@ final class AppController {
                 self?.presentDestinationPicker(for: saved)
             },
             onSkip: { [weak self] in
-                self?.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .skipped)
+                if let saved {
+                    self?.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .skipped)
+                }
                 self?.destinationWindow?.close()
-                self?.openHistory()
+                if saved != nil {
+                    self?.openHistory()
+                }
             },
             onSelectWindow: { [weak self] window in
                 Task { @MainActor in
@@ -217,7 +252,7 @@ final class AppController {
         showWindow(destinationWindow, minimumSize: NSSize(width: 420, height: 520))
     }
 
-    private func prepareAccessibilityForDelivery(saved: SavedCapture) -> Bool {
+    private func prepareAccessibilityForDelivery(saved: SavedCapture?) -> Bool {
         guard !PermissionService.hasAccessibilityPermission else {
             return true
         }
@@ -234,35 +269,42 @@ final class AppController {
             switch action {
             case .openSettings:
                 PermissionService.openAccessibilitySettings()
-                self.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .failed)
-                self.openHistory()
+                self.markDeliveryFailed(saved: saved)
             case .retry:
                 if PermissionService.hasAccessibilityPermission {
                     canDeliver = true
                 } else {
                     PermissionService.requestAccessibilityPermission()
-                    self.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .failed)
-                    self.openHistory()
+                    self.markDeliveryFailed(saved: saved)
                 }
             case .cancel:
-                self.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .failed)
-                self.openHistory()
+                self.markDeliveryFailed(saved: saved)
             }
         }
         return canDeliver
     }
 
-    private func deliver(saved: SavedCapture, to destination: AppDestination, window: AppWindowDestination) async {
+    private func markDeliveryFailed(saved: SavedCapture?) {
+        guard let saved else { return }
+        storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .failed)
+        openHistory()
+    }
+
+    private func deliver(saved: SavedCapture?, to destination: AppDestination, window: AppWindowDestination) async {
         destinationWindow?.close()
         do {
             try await deliveryService.deliver(to: destination, window: window)
-            storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .delivered)
+            if let saved {
+                storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .delivered)
+            }
             TraceNotificationCenter.showDeliveryCompleted(
                 appName: destination.name,
                 enabled: true
             )
         } catch {
-            storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .failed)
+            if let saved {
+                storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .failed)
+            }
             if case TraceError.accessibilityRequired = error {
                 PermissionService.requestAccessibilityPermission()
             } else {
@@ -272,21 +314,27 @@ final class AppController {
                     enabled: true
                 )
             }
-            openHistory()
+            if saved != nil {
+                openHistory()
+            }
         }
     }
 
-    private func deliver(saved: SavedCapture, to destination: AppDestination, appSpecificTarget: AppSpecificDestination) async {
+    private func deliver(saved: SavedCapture?, to destination: AppDestination, appSpecificTarget: AppSpecificDestination) async {
         destinationWindow?.close()
         do {
             try await deliveryService.deliver(to: destination, appSpecificTarget: appSpecificTarget)
-            storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .delivered)
+            if let saved {
+                storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .delivered)
+            }
             TraceNotificationCenter.showDeliveryCompleted(
                 appName: destination.name,
                 enabled: true
             )
         } catch {
-            storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .failed)
+            if let saved {
+                storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .failed)
+            }
             if case TraceError.accessibilityRequired = error {
                 PermissionService.requestAccessibilityPermission()
             } else {
@@ -296,7 +344,9 @@ final class AppController {
                     enabled: true
                 )
             }
-            openHistory()
+            if saved != nil {
+                openHistory()
+            }
         }
     }
 

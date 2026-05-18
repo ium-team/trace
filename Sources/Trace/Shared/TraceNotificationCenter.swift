@@ -20,6 +20,11 @@ final class TraceNotificationCenter: NSObject, UNUserNotificationCenterDelegate 
         post(title: "캡처 저장 완료", body: "\(folderName) 폴더에 저장됨")
     }
 
+    static func showCopied(enabled: Bool) {
+        guard enabled else { return }
+        post(title: "캡처 복사 완료", body: "클립보드에 이미지가 복사됨")
+    }
+
     static func showDeliveryCompleted(appName: String, enabled: Bool) {
         guard enabled else { return }
         post(title: "전달 완료", body: "\(appName)에 붙여넣기 이벤트를 보냈습니다.")

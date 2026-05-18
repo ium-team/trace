@@ -130,6 +130,38 @@ struct CaptureMetadata: Codable {
 }
 
 struct TraceSettings: Codable, Equatable {
+    enum BasicCaptureAction: String, Codable, CaseIterable, Identifiable {
+        case copyAndSave
+        case copyOnly
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .copyAndSave:
+                "복사 및 저장"
+            case .copyOnly:
+                "복사"
+            }
+        }
+    }
+
+    enum DeliveryCaptureAction: String, Codable, CaseIterable, Identifiable {
+        case copyAndDeliver
+        case copySaveAndDeliver
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .copyAndDeliver:
+                "복사 및 전달"
+            case .copySaveAndDeliver:
+                "복사 및 저장 및 전달"
+            }
+        }
+    }
+
     enum FileNameRule: String, Codable, CaseIterable, Identifiable {
         case dateTime
         case sequence
@@ -194,7 +226,11 @@ struct TraceSettings: Codable, Equatable {
 
     var saveDirectory: String
     var globalShortcut: String
+    var basicCaptureShortcut: String
+    var deliveryCaptureShortcut: String
     var defaultCaptureMode: CaptureMode
+    var basicCaptureAction: BasicCaptureAction
+    var deliveryCaptureAction: DeliveryCaptureAction
     var fileNameRule: FileNameRule
     var dateFileNameFormat: DateFileNameFormat
     var sequenceStyle: SequenceStyle
@@ -209,7 +245,11 @@ struct TraceSettings: Codable, Equatable {
     static let defaults = TraceSettings(
         saveDirectory: defaultSaveDirectory,
         globalShortcut: "command+shift+2",
+        basicCaptureShortcut: "command+shift+2",
+        deliveryCaptureShortcut: "command+shift+3",
         defaultCaptureMode: .copyOnly,
+        basicCaptureAction: .copyAndSave,
+        deliveryCaptureAction: .copySaveAndDeliver,
         fileNameRule: .dateTime,
         dateFileNameFormat: .yearMonthDayHourMinuteSecond,
         sequenceStyle: .numeric
@@ -218,7 +258,11 @@ struct TraceSettings: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case saveDirectory
         case globalShortcut
+        case basicCaptureShortcut
+        case deliveryCaptureShortcut
         case defaultCaptureMode
+        case basicCaptureAction
+        case deliveryCaptureAction
         case fileNameRule
         case dateFileNameFormat
         case sequenceStyle
@@ -227,14 +271,22 @@ struct TraceSettings: Codable, Equatable {
     init(
         saveDirectory: String,
         globalShortcut: String,
+        basicCaptureShortcut: String? = nil,
+        deliveryCaptureShortcut: String = "command+shift+3",
         defaultCaptureMode: CaptureMode,
-        fileNameRule: FileNameRule,
-        dateFileNameFormat: DateFileNameFormat,
-        sequenceStyle: SequenceStyle
+        basicCaptureAction: BasicCaptureAction = .copyAndSave,
+        deliveryCaptureAction: DeliveryCaptureAction = .copySaveAndDeliver,
+        fileNameRule: FileNameRule = .dateTime,
+        dateFileNameFormat: DateFileNameFormat = .yearMonthDayHourMinuteSecond,
+        sequenceStyle: SequenceStyle = .numeric
     ) {
         self.saveDirectory = saveDirectory
         self.globalShortcut = globalShortcut
+        self.basicCaptureShortcut = basicCaptureShortcut ?? globalShortcut
+        self.deliveryCaptureShortcut = deliveryCaptureShortcut
         self.defaultCaptureMode = defaultCaptureMode
+        self.basicCaptureAction = basicCaptureAction
+        self.deliveryCaptureAction = deliveryCaptureAction
         self.fileNameRule = fileNameRule
         self.dateFileNameFormat = dateFileNameFormat
         self.sequenceStyle = sequenceStyle
@@ -244,7 +296,11 @@ struct TraceSettings: Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         saveDirectory = try container.decode(String.self, forKey: .saveDirectory)
         globalShortcut = try container.decode(String.self, forKey: .globalShortcut)
+        basicCaptureShortcut = try container.decodeIfPresent(String.self, forKey: .basicCaptureShortcut) ?? globalShortcut
+        deliveryCaptureShortcut = try container.decodeIfPresent(String.self, forKey: .deliveryCaptureShortcut) ?? "command+shift+3"
         defaultCaptureMode = try container.decode(CaptureMode.self, forKey: .defaultCaptureMode)
+        basicCaptureAction = try container.decodeIfPresent(BasicCaptureAction.self, forKey: .basicCaptureAction) ?? .copyAndSave
+        deliveryCaptureAction = try container.decodeIfPresent(DeliveryCaptureAction.self, forKey: .deliveryCaptureAction) ?? .copySaveAndDeliver
         fileNameRule = try container.decodeIfPresent(FileNameRule.self, forKey: .fileNameRule) ?? .dateTime
         dateFileNameFormat = try container.decodeIfPresent(DateFileNameFormat.self, forKey: .dateFileNameFormat) ?? .yearMonthDayHourMinuteSecond
         sequenceStyle = try container.decodeIfPresent(SequenceStyle.self, forKey: .sequenceStyle) ?? .numeric

@@ -6,6 +6,7 @@ import Observation
 final class SettingsStore {
     private let fileManager: FileManager
     private(set) var settings: TraceSettings
+    @ObservationIgnored var onUpdate: ((TraceSettings) -> Void)?
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -22,8 +23,11 @@ final class SettingsStore {
     }
 
     func update(_ newSettings: TraceSettings) {
-        settings = newSettings
+        var normalized = newSettings
+        normalized.globalShortcut = normalized.basicCaptureShortcut
+        settings = normalized
         save()
+        onUpdate?(normalized)
     }
 
     func save() {

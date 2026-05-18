@@ -54,9 +54,31 @@ struct SettingsView: View {
                         Text(mode.title).tag(mode)
                     }
                 }
-                TextField("전역 단축키", text: $draft.globalShortcut)
-                    .disabled(true)
-                Text("현재 단축키: command+shift+2, command+shift+3. 단축키를 누르면 캡처 오버레이가 바로 열리고, 오버레이 안에서 범위와 방식을 바꿀 수 있습니다.")
+                Text("두 단축키는 같은 캡처 오버레이를 열고, 처음 선택된 캡처 방식만 다릅니다.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("기본 캡처") {
+                Picker("완료 후 동작", selection: $draft.basicCaptureAction) {
+                    ForEach(TraceSettings.BasicCaptureAction.allCases) { action in
+                        Text(action.title).tag(action)
+                    }
+                }
+                TextField("전역 단축키", text: $draft.basicCaptureShortcut)
+                Text("예: command+shift+2")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("앱으로 전달 캡처") {
+                Picker("완료 후 동작", selection: $draft.deliveryCaptureAction) {
+                    ForEach(TraceSettings.DeliveryCaptureAction.allCases) { action in
+                        Text(action.title).tag(action)
+                    }
+                }
+                TextField("전역 단축키", text: $draft.deliveryCaptureShortcut)
+                Text("전달은 붙여넣기 기반이라 항상 먼저 클립보드에 복사합니다. 저장하지 않는 전달 캡처는 히스토리에 남지 않습니다.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

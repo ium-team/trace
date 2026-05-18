@@ -100,8 +100,11 @@ TraceApp
 주요 책임:
 
 - 저장 위치 설정
-- 전역 단축키 설정
+- 기본 캡처 전역 단축키 설정
+- 앱으로 전달 캡처 전역 단축키 설정
 - 기본 캡처 방식 설정
+- 기본 캡처 완료 후 동작 설정
+- 앱으로 전달 캡처 완료 후 동작 설정
 - macOS 알림 설정으로 이동
 
 ## 핵심 도메인 모델
@@ -157,22 +160,25 @@ accessibilityElement
 
 ```text
 saveDirectory
-globalShortcut
+basicCaptureShortcut
+deliveryCaptureShortcut
 defaultCaptureMode
+basicCaptureAction
+deliveryCaptureAction
 ```
 
 ## 핵심 흐름
 
-### 복사만 하기 캡처
+### 기본 캡처
 
 ```text
 GlobalShortcut
   -> CaptureOverlay(select area/full screen and copy/deliver while active)
   -> CaptureResult
-  -> Storage.save
   -> Clipboard.copy
-  -> Notification.showSavedLocation
-  -> History.refresh
+  -> Storage.save if basicCaptureAction is copyAndSave
+  -> Notification.showSavedLocation if saved
+  -> History.refresh if saved
 ```
 
 ### 앱으로 자동 전달 캡처
@@ -181,12 +187,12 @@ GlobalShortcut
 GlobalShortcut
   -> CaptureOverlay(select area/full screen and copy/deliver while active)
   -> CaptureResult
-  -> Storage.save
   -> Clipboard.copy
+  -> Storage.save if deliveryCaptureAction is copySaveAndDeliver
   -> DeliveryDestinationPicker
   -> DeliveryWindowPicker
   -> Delivery.deliver
-  -> History.refresh
+  -> History.refresh if saved
 ```
 
 ### 히스토리에서 다시 복사

@@ -76,7 +76,11 @@ YYYY-MM-DD_HH-mm-ss-3.png
 {
   "saveDirectory": "~/Pictures/Trace",
   "globalShortcut": "command+shift+2",
-  "defaultCaptureMode": "copyOnly"
+  "basicCaptureShortcut": "command+shift+2",
+  "deliveryCaptureShortcut": "command+shift+3",
+  "defaultCaptureMode": "copyOnly",
+  "basicCaptureAction": "copyAndSave",
+  "deliveryCaptureAction": "copySaveAndDeliver"
 }
 ```
 
