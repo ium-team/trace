@@ -203,11 +203,6 @@ final class AppController {
 
         PermissionService.requestAccessibilityPermission()
         storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .failed)
-        showPermissionAlert(
-            message: "손쉬운 사용 권한이 필요합니다.",
-            info: "앱으로 자동 전달하려면 Trace가 대상 앱을 활성화하고 붙여넣기 이벤트를 보낼 수 있어야 합니다. 권한을 허용한 뒤 다시 앱 전달 캡처를 시작하세요.",
-            openAction: PermissionService.openAccessibilitySettings
-        )
         openHistory()
         return false
     }
@@ -316,17 +311,6 @@ final class AppController {
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-    }
-
-    private func showPermissionAlert(message: String, info: String, openAction: () -> Void) {
-        let alert = NSAlert()
-        alert.messageText = message
-        alert.informativeText = info
-        alert.addButton(withTitle: "시스템 설정 열기")
-        alert.addButton(withTitle: "닫기")
-        if alert.runModal() == .alertFirstButtonReturn {
-            openAction()
-        }
     }
 
     private func showError(_ message: String) {
