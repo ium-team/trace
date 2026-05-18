@@ -66,17 +66,13 @@ struct SettingsView: View {
                 )
             }
 
-            HStack {
-                Spacer()
-                Button("저장") {
-                    settingsStore.update(draft)
-                }
-                .keyboardShortcut(.defaultAction)
-            }
         }
         .formStyle(.grouped)
         .padding()
         .frame(minWidth: 620, minHeight: 480)
+        .onChange(of: draft) { _, newValue in
+            settingsStore.update(newValue)
+        }
         .onChange(of: settingsStore.settings) { _, newValue in
             draft = newValue
         }
