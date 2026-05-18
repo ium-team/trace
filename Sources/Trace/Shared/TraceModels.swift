@@ -57,11 +57,11 @@ struct CapturePlan: Identifiable, Hashable {
         case (.area, .copyOnly):
             "드래그한 영역을 저장하고 클립보드에 복사합니다."
         case (.fullScreen, .copyOnly):
-            "주 디스플레이 전체를 저장하고 클립보드에 복사합니다."
+            "현재 디스플레이 전체를 저장하고 클립보드에 복사합니다."
         case (.area, .deliverToApp):
             "드래그한 영역을 저장한 뒤 전달할 앱을 선택합니다."
         case (.fullScreen, .deliverToApp):
-            "주 디스플레이 전체를 저장한 뒤 전달할 앱을 선택합니다."
+            "현재 디스플레이 전체를 저장한 뒤 전달할 앱을 선택합니다."
         }
     }
 
@@ -166,6 +166,11 @@ struct CaptureResult {
             pixelHeight = Int(image.size.height)
         }
     }
+}
+
+struct InteractiveCaptureResult {
+    var capture: CaptureResult
+    var plan: CapturePlan
 }
 
 struct SavedCapture {

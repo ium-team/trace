@@ -10,7 +10,6 @@ final class AppController {
     private let hotKeyManager = HotKeyManager()
 
     private var statusItem: NSStatusItem?
-    private var captureLauncherWindow: NSWindow?
     private var historyWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var destinationWindow: NSWindow?
@@ -31,7 +30,7 @@ final class AppController {
 
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "캡처 시작", action: #selector(openCaptureLauncherFromMenu), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "캡처 시작", action: #selector(startCaptureFromMenu), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "히스토리 열기", action: #selector(openHistoryFromMenu), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "설정 열기", action: #selector(openSettingsFromMenu), keyEquivalent: ""))
@@ -43,15 +42,15 @@ final class AppController {
 
     private func registerHotKeys() {
         hotKeyManager.register(copyAction: { [weak self] in
-            Task { @MainActor in self?.openCaptureLauncher(defaultPlan: .areaCopy) }
+            Task { @MainActor in self?.startInteractiveCapture(defaultPlan: .areaCopy) }
         }, deliverAction: { [weak self] in
-            Task { @MainActor in self?.openCaptureLauncher(defaultPlan: .areaDelivery) }
+            Task { @MainActor in self?.startInteractiveCapture(defaultPlan: .areaDelivery) }
         })
     }
 
-    @objc private func openCaptureLauncherFromMenu() {
+    @objc private func startCaptureFromMenu() {
         let defaultPlan = settingsStore.settings.defaultCaptureMode == .deliverToApp ? CapturePlan.areaDelivery : .areaCopy
-        openCaptureLauncher(defaultPlan: defaultPlan)
+        startInteractiveCapture(defaultPlan: defaultPlan)
     }
 
     @objc private func openHistoryFromMenu() {
@@ -62,64 +61,34 @@ final class AppController {
         openSettings()
     }
 
-    private func openCaptureLauncher(defaultPlan: CapturePlan) {
-        let view = CaptureLauncherView(
-            defaultPlan: defaultPlan,
-            onCancel: { [weak self] in
-                self?.captureLauncherWindow?.close()
-                self?.captureLauncherWindow = nil
-            },
-            onCapture: { [weak self] plan in
-                self?.captureLauncherWindow?.close()
-                self?.captureLauncherWindow = nil
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                    self?.startCapture(mode: plan.mode, scope: plan.scope)
-                }
-            }
-        )
-
-        if captureLauncherWindow == nil {
-            captureLauncherWindow = makeWindow(title: "Trace 캡처", size: NSSize(width: 600, height: 390), rootView: view)
-        } else {
-            captureLauncherWindow?.contentViewController = NSHostingController(rootView: view)
-        }
-        showWindow(captureLauncherWindow, minimumSize: NSSize(width: 600, height: 390))
-    }
-
-    func startCapture(mode: CaptureMode? = nil, scope: CaptureScope = .area) {
-        let captureMode = mode ?? settingsStore.settings.defaultCaptureMode
+    func startInteractiveCapture(defaultPlan: CapturePlan? = nil) {
+        let plan = defaultPlan ?? CapturePlan(mode: settingsStore.settings.defaultCaptureMode, scope: .area)
         guard PermissionService.hasScreenRecordingPermission else {
             guard PermissionService.requestScreenRecordingPermission() else {
                 return
             }
 
-            performCapture(mode: captureMode, scope: scope)
+            performInteractiveCapture(defaultPlan: plan)
             return
         }
 
-        performCapture(mode: captureMode, scope: scope)
+        performInteractiveCapture(defaultPlan: plan)
     }
 
-    private func performCapture(mode captureMode: CaptureMode, scope: CaptureScope) {
-        if scope == .fullScreen {
-            do {
-                let capture = try captureController.captureFullScreen()
-                Task { @MainActor in
-                    await handleCaptureResult(.success(capture), mode: captureMode)
-                }
-            } catch {
-                Task { @MainActor in
-                    await handleCaptureResult(.failure(error), mode: captureMode)
-                }
-            }
-            return
-        }
-
-        captureController.start { [weak self] result in
+    private func performInteractiveCapture(defaultPlan: CapturePlan) {
+        captureController.start(defaultPlan: defaultPlan) { [weak self] result in
             Task { @MainActor in
-                await self?.handleCaptureResult(result, mode: captureMode)
+                await self?.handleInteractiveCaptureResult(result)
             }
+        }
+    }
+
+    private func handleInteractiveCaptureResult(_ result: Result<InteractiveCaptureResult, Error>) async {
+        switch result {
+        case .success(let interactiveResult):
+            await handleCaptureResult(.success(interactiveResult.capture), mode: interactiveResult.plan.mode)
+        case .failure(let error):
+            await handleCaptureResult(.failure(error), mode: settingsStore.settings.defaultCaptureMode)
         }
     }
 

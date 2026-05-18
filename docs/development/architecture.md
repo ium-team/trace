@@ -160,8 +160,7 @@ showSaveNotification
 
 ```text
 GlobalShortcut
-  -> CaptureLauncher
-  -> Capture(area overlay or full screen)
+  -> CaptureOverlay(select area/full screen and copy/deliver while active)
   -> CaptureResult
   -> Storage.save
   -> Clipboard.copy
@@ -173,8 +172,7 @@ GlobalShortcut
 
 ```text
 GlobalShortcut
-  -> CaptureLauncher
-  -> Capture(area overlay or full screen, deliverToApp)
+  -> CaptureOverlay(select area/full screen and copy/deliver while active)
   -> CaptureResult
   -> Storage.save
   -> Clipboard.copy
