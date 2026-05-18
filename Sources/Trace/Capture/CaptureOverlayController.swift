@@ -4,6 +4,11 @@ import Foundation
 
 @MainActor
 final class CaptureOverlayController {
+    private final class OverlayPanel: NSPanel {
+        override var canBecomeKey: Bool { true }
+        override var canBecomeMain: Bool { true }
+    }
+
     private final class OverlaySession {
         let screen: NSScreen
         let window: NSPanel
@@ -21,6 +26,7 @@ final class CaptureOverlayController {
     private var isFinishing = false
     private var generation = 0
     private var currentPlan: CapturePlan = .areaCopy
+    private var keyMonitor: Any?
 
     func start(defaultPlan: CapturePlan, completion: @escaping (Result<InteractiveCaptureResult, Error>) -> Void) {
         cancelActiveOverlay()
@@ -32,7 +38,7 @@ final class CaptureOverlayController {
         sessions = NSScreen.screens.map { screen in
             let view = CaptureOverlayView(frame: NSRect(origin: .zero, size: screen.frame.size))
             view.plan = defaultPlan
-            let window = NSPanel(
+            let window = OverlayPanel(
                 contentRect: screen.frame,
                 styleMask: [.borderless],
                 backing: .buffered,
@@ -66,7 +72,12 @@ final class CaptureOverlayController {
             return OverlaySession(screen: screen, window: window, view: view)
         }
 
+        installKeyMonitor()
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func forceCancelActiveOverlay() {
+        cancel()
     }
 
     func captureFullScreen() throws -> CaptureResult {
@@ -163,7 +174,9 @@ final class CaptureOverlayController {
 
     private func cancel() {
         cancelActiveOverlay()
+        completion?(.failure(TraceError.captureCancelled))
         completion = nil
+        isFinishing = false
     }
 
     private func cancelActiveOverlay() {
@@ -176,6 +189,7 @@ final class CaptureOverlayController {
 
     private func hideWindowsForDeferredClose() -> [OverlaySession] {
         let activeSessions = sessions
+        removeKeyMonitor()
         activeSessions.forEach { $0.window.orderOut(nil) }
         sessions.removeAll()
         return activeSessions
@@ -184,10 +198,51 @@ final class CaptureOverlayController {
     private func close(sessions: [OverlaySession]) {
         sessions.forEach { session in
             session.view.onComplete = nil
+            session.view.onCaptureFullScreen = nil
+            session.view.onPlanChange = nil
             session.view.onCancel = nil
             session.window.contentView = nil
             session.window.close()
         }
+    }
+
+    private func installKeyMonitor() {
+        removeKeyMonitor()
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, !self.sessions.isEmpty else { return event }
+            guard self.handleKey(event) else { return event }
+            return nil
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+            self.keyMonitor = nil
+        }
+    }
+
+    private func handleKey(_ event: NSEvent) -> Bool {
+        switch event.keyCode {
+        case 53:
+            cancel()
+            return true
+        case 36, 76, 49:
+            captureFromKeyInput()
+            return true
+        default:
+            if event.modifierFlags.contains(.command),
+               event.charactersIgnoringModifiers?.lowercased() == "c" {
+                captureFromKeyInput()
+                return true
+            }
+            return false
+        }
+    }
+
+    private func captureFromKeyInput() {
+        guard let session = sessions.first(where: { $0.window.isKeyWindow }) ?? sessions.first else { return }
+        session.view.captureFromKeyboard()
     }
 
     private func captureButtonCell(for view: CaptureOverlayView) -> NSButtonCell? {
@@ -375,7 +430,7 @@ final class CaptureOverlayView: NSView {
 
         NSLayoutConstraint.activate([
             toolbar.centerXAnchor.constraint(equalTo: centerXAnchor),
-            toolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: 28),
+            toolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -28),
             stack.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor, constant: 12),
             stack.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -12),
             stack.topAnchor.constraint(equalTo: toolbar.topAnchor, constant: 10),
@@ -407,6 +462,10 @@ final class CaptureOverlayView: NSView {
     }
 
     @objc private func capturePressed() {
+        captureFromKeyboard()
+    }
+
+    fileprivate func captureFromKeyboard() {
         if plan.scope == .fullScreen {
             onCaptureFullScreen?()
         } else if let selectionRect {

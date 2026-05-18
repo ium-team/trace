@@ -30,13 +30,34 @@ final class AppController {
 
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "캡처 시작", action: #selector(startCaptureFromMenu), keyEquivalent: ""))
+        let startCaptureItem = NSMenuItem(title: "캡처 시작", action: #selector(startCaptureFromMenu), keyEquivalent: "")
+        startCaptureItem.target = self
+        menu.addItem(startCaptureItem)
+
+        let cancelCaptureItem = NSMenuItem(title: "캡처 취소", action: #selector(cancelCaptureFromMenu), keyEquivalent: "")
+        cancelCaptureItem.target = self
+        menu.addItem(cancelCaptureItem)
+
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "히스토리 열기", action: #selector(openHistoryFromMenu), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "설정 열기", action: #selector(openSettingsFromMenu), keyEquivalent: ""))
+
+        let historyItem = NSMenuItem(title: "히스토리 열기", action: #selector(openHistoryFromMenu), keyEquivalent: "")
+        historyItem.target = self
+        menu.addItem(historyItem)
+
+        let settingsItem = NSMenuItem(title: "설정 열기", action: #selector(openSettingsFromMenu), keyEquivalent: "")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        menu.items.forEach { $0.target = self }
+
+        let forceQuitItem = NSMenuItem(title: "캡처 취소 후 종료", action: #selector(forceQuitFromMenu), keyEquivalent: "")
+        forceQuitItem.target = self
+        menu.addItem(forceQuitItem)
+
+        let quitItem = NSMenuItem(title: "종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quitItem.target = NSApp
+        menu.addItem(quitItem)
+
         return menu
     }
 
@@ -51,6 +72,15 @@ final class AppController {
     @objc private func startCaptureFromMenu() {
         let defaultPlan = settingsStore.settings.defaultCaptureMode == .deliverToApp ? CapturePlan.areaDelivery : .areaCopy
         startInteractiveCapture(defaultPlan: defaultPlan)
+    }
+
+    @objc private func cancelCaptureFromMenu() {
+        captureController.forceCancelActiveOverlay()
+    }
+
+    @objc private func forceQuitFromMenu() {
+        captureController.forceCancelActiveOverlay()
+        NSApp.terminate(nil)
     }
 
     @objc private func openHistoryFromMenu() {
