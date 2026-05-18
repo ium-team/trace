@@ -133,7 +133,6 @@ struct TraceSettings: Codable, Equatable {
     var saveDirectory: String
     var globalShortcut: String
     var defaultCaptureMode: CaptureMode
-    var showSaveNotification: Bool
 
     static var defaultSaveDirectory: String {
         FileManager.default.homeDirectoryForCurrentUser
@@ -145,8 +144,7 @@ struct TraceSettings: Codable, Equatable {
     static let defaults = TraceSettings(
         saveDirectory: defaultSaveDirectory,
         globalShortcut: "command+shift+2",
-        defaultCaptureMode: .copyOnly,
-        showSaveNotification: true
+        defaultCaptureMode: .copyOnly
     )
 }
 

@@ -61,8 +61,7 @@ final class CaptureStorageTests: XCTestCase {
         let settings = TraceSettings(
             saveDirectory: temporaryRoot.path,
             globalShortcut: "command+shift+2",
-            defaultCaptureMode: .copyOnly,
-            showSaveNotification: false
+            defaultCaptureMode: .copyOnly
         )
         let store = SettingsStore(settings: settings)
         return CaptureStorage(settingsStore: store)

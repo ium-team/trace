@@ -6,8 +6,6 @@ struct SettingsView: View {
     @Bindable var settingsStore: SettingsStore
     @State private var draft: TraceSettings
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
-    @State private var isReconcilingNotificationPreference = false
-    @State private var shouldEnableNotificationsAfterSystemApproval = false
 
     init(settingsStore: SettingsStore) {
         self.settingsStore = settingsStore
@@ -25,8 +23,16 @@ struct SettingsView: View {
                         Label("선택", systemImage: "folder")
                     }
                 }
-                Toggle("알림센터 알림 표시", isOn: $draft.showSaveNotification)
-                notificationPreferenceMessage
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("알림")
+                        Text(notificationStatusDescription)
+                            .font(.caption)
+                            .foregroundStyle(notificationStatus == .denied ? .orange : .secondary)
+                    }
+                    Spacer()
+                    Button("알림 설정 열기", action: openNotificationSettings)
+                }
             }
 
             Section("캡처") {
@@ -64,7 +70,6 @@ struct SettingsView: View {
                 Spacer()
                 Button("저장") {
                     settingsStore.update(draft)
-                    TraceNotificationCenter.requestIfNeeded(enabled: draft.showSaveNotification)
                 }
                 .keyboardShortcut(.defaultAction)
             }
@@ -77,18 +82,10 @@ struct SettingsView: View {
         }
         .task {
             await refreshNotificationStatus()
-            reconcileNotificationPreferenceWithSystem()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task {
                 await refreshNotificationStatus()
-                reconcileNotificationPreferenceWithSystem()
-            }
-        }
-        .onChange(of: draft.showSaveNotification) { _, enabled in
-            guard !isReconcilingNotificationPreference else { return }
-            Task {
-                await handleNotificationPreferenceChange(enabled: enabled)
             }
         }
     }
@@ -114,74 +111,25 @@ struct SettingsView: View {
         notificationStatus == .authorized || notificationStatus == .provisional
     }
 
-    @ViewBuilder
-    private var notificationPreferenceMessage: some View {
+    private var notificationStatusDescription: String {
         switch notificationStatus {
-        case .denied:
-            Text("macOS 시스템 설정에서 Trace 알림이 꺼져 있습니다. 여기서 켜려면 먼저 시스템 설정에서 허용해야 합니다.")
-                .font(.caption)
-                .foregroundStyle(.orange)
-        case .notDetermined where draft.showSaveNotification:
-            Text("저장하면 macOS 알림 권한을 요청합니다.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        default:
-            EmptyView()
-        }
-    }
-
-    private func handleNotificationPreferenceChange(enabled: Bool) async {
-        await refreshNotificationStatus()
-
-        guard enabled else {
-            shouldEnableNotificationsAfterSystemApproval = false
-            return
-        }
-
-        switch notificationStatus {
-        case .notDetermined:
-            _ = await TraceNotificationCenter.requestAuthorization()
-            await refreshNotificationStatus()
-            if !canPostNotifications {
-                forceNotificationPreferenceOff()
-            }
-        case .denied:
-            shouldEnableNotificationsAfterSystemApproval = true
-            forceNotificationPreferenceOff()
-            PermissionService.openNotificationSettings()
         case .authorized, .provisional:
-            break
+            "macOS 시스템 설정에서 켜져 있습니다."
+        case .denied:
+            "macOS 시스템 설정에서 꺼져 있습니다."
+        case .notDetermined:
+            "아직 macOS 알림 권한이 정해지지 않았습니다."
         case .ephemeral:
-            forceNotificationPreferenceOff()
+            "현재 세션에서만 허용되어 있습니다."
         @unknown default:
-            forceNotificationPreferenceOff()
+            "알림 상태를 확인할 수 없습니다."
         }
-    }
-
-    private func reconcileNotificationPreferenceWithSystem() {
-        if shouldEnableNotificationsAfterSystemApproval, canPostNotifications {
-            shouldEnableNotificationsAfterSystemApproval = false
-            isReconcilingNotificationPreference = true
-            draft.showSaveNotification = true
-            isReconcilingNotificationPreference = false
-            return
-        }
-
-        guard draft.showSaveNotification, notificationStatus == .denied else { return }
-        forceNotificationPreferenceOff()
-    }
-
-    private func forceNotificationPreferenceOff() {
-        isReconcilingNotificationPreference = true
-        draft.showSaveNotification = false
-        isReconcilingNotificationPreference = false
     }
 
     private func openNotificationSettings() {
         PermissionService.openNotificationSettings()
         Task {
             await refreshNotificationStatus()
-            reconcileNotificationPreferenceWithSystem()
         }
     }
 }

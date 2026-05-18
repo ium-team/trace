@@ -102,7 +102,7 @@ TraceApp
 - 저장 위치 설정
 - 전역 단축키 설정
 - 기본 캡처 방식 설정
-- 알림 표시 여부 설정
+- macOS 알림 설정으로 이동
 
 ## 핵심 도메인 모델
 
@@ -151,7 +151,6 @@ isActive
 saveDirectory
 globalShortcut
 defaultCaptureMode
-showSaveNotification
 ```
 
 ## 핵심 흐름
