@@ -5,6 +5,8 @@ import UserNotifications
 struct SettingsView: View {
     @Bindable var settingsStore: SettingsStore
     @State private var draft: TraceSettings
+    @State private var hasScreenRecordingPermission = PermissionService.hasScreenRecordingPermission
+    @State private var hasAccessibilityPermission = PermissionService.hasAccessibilityPermission
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
 
     init(settingsStore: SettingsStore) {
@@ -51,13 +53,13 @@ struct SettingsView: View {
             Section("권한") {
                 PermissionRow(
                     title: "Screen Recording",
-                    granted: PermissionService.hasScreenRecordingPermission,
+                    granted: hasScreenRecordingPermission,
                     action: PermissionService.openScreenRecordingSettings
                 )
                 PermissionRow(
                     title: "Accessibility",
-                    granted: PermissionService.hasAccessibilityPermission,
-                    action: PermissionService.openAccessibilitySettings
+                    granted: hasAccessibilityPermission,
+                    action: openAccessibilitySettings
                 )
                 PermissionRow(
                     title: "Notifications",
@@ -77,11 +79,11 @@ struct SettingsView: View {
             draft = newValue
         }
         .task {
-            await refreshNotificationStatus()
+            await refreshPermissionStatuses()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task {
-                await refreshNotificationStatus()
+                await refreshPermissionStatuses()
             }
         }
     }
@@ -101,6 +103,12 @@ struct SettingsView: View {
     private func refreshNotificationStatus() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         notificationStatus = settings.authorizationStatus
+    }
+
+    private func refreshPermissionStatuses() async {
+        hasScreenRecordingPermission = PermissionService.hasScreenRecordingPermission
+        hasAccessibilityPermission = PermissionService.hasAccessibilityPermission
+        await refreshNotificationStatus()
     }
 
     private var canPostNotifications: Bool {
@@ -127,6 +135,11 @@ struct SettingsView: View {
         Task {
             await refreshNotificationStatus()
         }
+    }
+
+    private func openAccessibilitySettings() {
+        PermissionService.requestAccessibilityPermission()
+        PermissionService.openAccessibilitySettings()
     }
 }
 

@@ -127,6 +127,9 @@ final class AppController {
                 )
 
                 if mode == .deliverToApp {
+                    guard prepareAccessibilityForDelivery(saved: saved) else {
+                        return
+                    }
                     presentDestinationPicker(for: saved)
                 } else {
                     openHistory()
@@ -160,6 +163,22 @@ final class AppController {
 
         destinationWindow = makeWindow(title: "전달 대상 선택", size: NSSize(width: 420, height: 520), rootView: view)
         showWindow(destinationWindow, minimumSize: NSSize(width: 420, height: 520))
+    }
+
+    private func prepareAccessibilityForDelivery(saved: SavedCapture) -> Bool {
+        guard !PermissionService.hasAccessibilityPermission else {
+            return true
+        }
+
+        PermissionService.requestAccessibilityPermission()
+        storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .failed)
+        showPermissionAlert(
+            message: "손쉬운 사용 권한이 필요합니다.",
+            info: "앱으로 자동 전달하려면 Trace가 대상 앱을 활성화하고 붙여넣기 이벤트를 보낼 수 있어야 합니다. 권한을 허용한 뒤 다시 앱 전달 캡처를 시작하세요.",
+            openAction: PermissionService.openAccessibilitySettings
+        )
+        openHistory()
+        return false
     }
 
     private func deliver(saved: SavedCapture, to destination: AppDestination) async {
