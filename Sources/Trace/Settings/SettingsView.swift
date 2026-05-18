@@ -1,8 +1,11 @@
 import AppKit
+import Combine
 import SwiftUI
 import UserNotifications
 
 struct SettingsView: View {
+    private static let permissionRefreshTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+
     @Bindable var settingsStore: SettingsStore
     @State private var draft: TraceSettings
     @State private var hasScreenRecordingPermission = PermissionService.hasScreenRecordingPermission
@@ -82,6 +85,11 @@ struct SettingsView: View {
             await refreshPermissionStatuses()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task {
+                await refreshPermissionStatuses()
+            }
+        }
+        .onReceive(Self.permissionRefreshTimer) { _ in
             Task {
                 await refreshPermissionStatuses()
             }
