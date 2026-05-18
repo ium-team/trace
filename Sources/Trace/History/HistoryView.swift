@@ -45,7 +45,23 @@ struct HistoryView: View {
         } message: {
             Text(message ?? "")
         }
+        .onAppear {
+            selectLatestCaptureIfNeeded(force: false)
+        }
+        .onChange(of: storage.captures) { _, _ in
+            if let selectedItem, storage.captures.contains(selectedItem) {
+                return
+            }
+            selectLatestCaptureIfNeeded(force: true)
+        }
         .frame(minWidth: 900, minHeight: 620)
+    }
+
+    private func selectLatestCaptureIfNeeded(force: Bool) {
+        if !force && selectedItem != nil {
+            return
+        }
+        selectedItem = storage.captures.first
     }
 }
 
