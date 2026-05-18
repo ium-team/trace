@@ -1,8 +1,10 @@
 import SwiftUI
+import UserNotifications
 
 struct SettingsView: View {
     @Bindable var settingsStore: SettingsStore
     @State private var draft: TraceSettings
+    @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
 
     init(settingsStore: SettingsStore) {
         self.settingsStore = settingsStore
@@ -47,6 +49,11 @@ struct SettingsView: View {
                     granted: PermissionService.hasAccessibilityPermission,
                     action: PermissionService.openAccessibilitySettings
                 )
+                PermissionRow(
+                    title: "Notifications",
+                    granted: notificationStatus == .authorized || notificationStatus == .provisional,
+                    action: PermissionService.openNotificationSettings
+                )
             }
 
             HStack {
@@ -64,6 +71,9 @@ struct SettingsView: View {
         .onChange(of: settingsStore.settings) { _, newValue in
             draft = newValue
         }
+        .task {
+            await refreshNotificationStatus()
+        }
     }
 
     private func chooseDirectory() {
@@ -76,6 +86,11 @@ struct SettingsView: View {
         if panel.runModal() == .OK, let url = panel.url {
             draft.saveDirectory = url.path
         }
+    }
+
+    private func refreshNotificationStatus() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        notificationStatus = settings.authorizationStatus
     }
 }
 

@@ -41,6 +41,16 @@ enum PermissionService {
         openSettingsPane("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
     }
 
+    static func openNotificationSettings() {
+        if let bundleIdentifier = Bundle.main.bundleIdentifier,
+           let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(bundleIdentifier)") {
+            NSWorkspace.shared.open(url)
+            return
+        }
+
+        openSettingsPane("x-apple.systempreferences:com.apple.Notifications-Settings.extension")
+    }
+
     private static func openSettingsPane(_ value: String) {
         guard let url = URL(string: value) else { return }
         NSWorkspace.shared.open(url)

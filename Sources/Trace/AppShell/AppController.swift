@@ -16,6 +16,7 @@ final class AppController {
 
     func start() {
         settingsStore.save()
+        TraceNotificationCenter.configure()
         TraceNotificationCenter.requestIfNeeded(enabled: settingsStore.settings.showSaveNotification)
         configureStatusItem()
         registerHotKeys()
