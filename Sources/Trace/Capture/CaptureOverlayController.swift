@@ -323,7 +323,13 @@ final class CaptureOverlayView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.makeFirstResponder(self)
+        window?.invalidateCursorRects(for: self)
         NSCursor.crosshair.set()
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addCursorRect(bounds, cursor: .crosshair)
     }
 
     override func draw(_ dirtyRect: NSRect) {
