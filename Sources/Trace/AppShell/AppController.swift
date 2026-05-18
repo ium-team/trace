@@ -175,20 +175,22 @@ final class AppController {
         do {
             try await deliveryService.deliver(to: destination)
             storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .delivered)
+            TraceNotificationCenter.showDeliveryCompleted(
+                appName: destination.name,
+                enabled: settingsStore.settings.showSaveNotification
+            )
         } catch {
             storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .failed)
             if case TraceError.accessibilityRequired = error {
                 PermissionService.requestAccessibilityPermission()
-                showPermissionAlert(
-                    message: "앱으로 자동 전달하려면 손쉬운 사용 권한이 필요합니다.",
-                    info: "저장과 클립보드 복사는 완료되었습니다. 권한을 허용하면 다음 캡처부터 자동 전달을 사용할 수 있습니다.",
-                    openAction: PermissionService.openAccessibilitySettings
-                )
             } else {
-                showError(error.localizedDescription)
+                TraceNotificationCenter.showDeliveryFailed(
+                    appName: destination.name,
+                    message: error.localizedDescription
+                )
             }
+            openHistory()
         }
-        openHistory()
     }
 
     private func openHistory() {
