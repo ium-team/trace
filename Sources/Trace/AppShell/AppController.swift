@@ -159,8 +159,6 @@ final class AppController {
                         return
                     }
                     presentDestinationPicker(for: saved)
-                } else if saved != nil {
-                    openHistory()
                 } else if shouldCopyToClipboard {
                     TraceNotificationCenter.showCopied(enabled: true)
                 }
@@ -205,9 +203,6 @@ final class AppController {
                     self?.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .skipped)
                 }
                 self?.destinationWindow?.close()
-                if saved != nil {
-                    self?.openHistory()
-                }
             },
             onSelect: { [weak self] destination in
                 Task { @MainActor in
@@ -235,9 +230,6 @@ final class AppController {
                     self?.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .skipped)
                 }
                 self?.destinationWindow?.close()
-                if saved != nil {
-                    self?.openHistory()
-                }
             },
             onSelectWindow: { [weak self] window in
                 Task { @MainActor in
@@ -290,7 +282,6 @@ final class AppController {
     private func markDeliveryFailed(saved: SavedCapture?) {
         guard let saved else { return }
         storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .failed)
-        openHistory()
     }
 
     private func deliver(saved: SavedCapture?, to destination: AppDestination, window: AppWindowDestination) async {
@@ -316,9 +307,6 @@ final class AppController {
                     message: error.localizedDescription,
                     enabled: true
                 )
-            }
-            if saved != nil {
-                openHistory()
             }
         }
     }
@@ -346,9 +334,6 @@ final class AppController {
                     message: error.localizedDescription,
                     enabled: true
                 )
-            }
-            if saved != nil {
-                openHistory()
             }
         }
     }
