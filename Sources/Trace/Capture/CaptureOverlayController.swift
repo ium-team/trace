@@ -375,7 +375,7 @@ final class CaptureOverlayView: NSView {
 
         NSLayoutConstraint.activate([
             toolbar.centerXAnchor.constraint(equalTo: centerXAnchor),
-            toolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -28),
+            toolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: 28),
             stack.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor, constant: 12),
             stack.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -12),
             stack.topAnchor.constraint(equalTo: toolbar.topAnchor, constant: 10),
