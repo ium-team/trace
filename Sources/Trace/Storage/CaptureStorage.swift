@@ -94,16 +94,20 @@ final class CaptureStorage {
             deliveryState: mode == .copyOnly ? .none : .skipped
         )
 
-        metadata.captures.append(item)
-        try writeMetadata()
+        var nextMetadata = metadata
+        nextMetadata.captures.append(item)
+        try writeMetadata(nextMetadata)
+        metadata = nextMetadata
         return SavedCapture(item: item, fileURL: imageURL, thumbnailURL: thumbnailURL)
     }
 
     func updateDelivery(itemID: String, appName: String?, state: DeliveryState) {
-        guard let index = metadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
-        metadata.captures[index].deliveredAppName = appName
-        metadata.captures[index].deliveryState = state
-        try? writeMetadata()
+        var nextMetadata = metadata
+        guard let index = nextMetadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
+        nextMetadata.captures[index].deliveredAppName = appName
+        nextMetadata.captures[index].deliveryState = state
+        guard (try? writeMetadata(nextMetadata)) != nil else { return }
+        metadata = nextMetadata
     }
 
     func capture(withID itemID: String) -> CaptureItem? {
@@ -111,14 +115,15 @@ final class CaptureStorage {
     }
 
     func rename(itemID: String, to proposedName: String) throws {
-        guard let index = metadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
+        var nextMetadata = metadata
+        guard let index = nextMetadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
         let cleanName = sanitizedFileBaseName(proposedName)
         guard !cleanName.isEmpty else {
             throw TraceError.invalidCaptureName
         }
 
         let rootURL = settingsStore.rootURL
-        let originalImageURL = absoluteURL(for: metadata.captures[index].filePath)
+        let originalImageURL = absoluteURL(for: nextMetadata.captures[index].filePath)
         let targetImageURL = uniqueURL(
             directory: originalImageURL.deletingLastPathComponent(),
             baseName: cleanName,
@@ -129,10 +134,10 @@ final class CaptureStorage {
         if originalImageURL.standardizedFileURL != targetImageURL.standardizedFileURL,
            fileManager.fileExists(atPath: originalImageURL.path) {
             try fileManager.moveItem(at: originalImageURL, to: targetImageURL)
-            metadata.captures[index].filePath = targetImageURL.relativePath(from: rootURL)
+            nextMetadata.captures[index].filePath = targetImageURL.relativePath(from: rootURL)
         }
 
-        if let thumbnailPath = metadata.captures[index].thumbnailPath {
+        if let thumbnailPath = nextMetadata.captures[index].thumbnailPath {
             let originalThumbnailURL = absoluteURL(for: thumbnailPath)
             if fileManager.fileExists(atPath: originalThumbnailURL.path) {
                 let targetThumbnailURL = uniqueURL(
@@ -144,19 +149,21 @@ final class CaptureStorage {
                 if originalThumbnailURL.standardizedFileURL != targetThumbnailURL.standardizedFileURL {
                     try? fileManager.moveItem(at: originalThumbnailURL, to: targetThumbnailURL)
                     if fileManager.fileExists(atPath: targetThumbnailURL.path) {
-                        metadata.captures[index].thumbnailPath = targetThumbnailURL.relativePath(from: rootURL)
+                        nextMetadata.captures[index].thumbnailPath = targetThumbnailURL.relativePath(from: rootURL)
                     }
                 }
             }
         }
 
-        metadata.captures[index].title = cleanName
-        try writeMetadata()
+        nextMetadata.captures[index].title = cleanName
+        try writeMetadata(nextMetadata)
+        metadata = nextMetadata
     }
 
     func delete(itemID: String) throws {
-        guard let index = metadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
-        let item = metadata.captures[index]
+        var nextMetadata = metadata
+        guard let index = nextMetadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
+        let item = nextMetadata.captures[index]
 
         let imageURL = absoluteURL(for: item.filePath)
         if fileManager.fileExists(atPath: imageURL.path) {
@@ -170,20 +177,25 @@ final class CaptureStorage {
             }
         }
 
-        metadata.captures.remove(at: index)
-        try writeMetadata()
+        nextMetadata.captures.remove(at: index)
+        try writeMetadata(nextMetadata)
+        metadata = nextMetadata
     }
 
     func setPinned(_ isPinned: Bool, itemID: String) {
-        guard let index = metadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
-        metadata.captures[index].isPinned = isPinned
-        try? writeMetadata()
+        var nextMetadata = metadata
+        guard let index = nextMetadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
+        nextMetadata.captures[index].isPinned = isPinned
+        guard (try? writeMetadata(nextMetadata)) != nil else { return }
+        metadata = nextMetadata
     }
 
     func setBookmarked(_ isBookmarked: Bool, itemID: String) {
-        guard let index = metadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
-        metadata.captures[index].isBookmarked = isBookmarked
-        try? writeMetadata()
+        var nextMetadata = metadata
+        guard let index = nextMetadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
+        nextMetadata.captures[index].isBookmarked = isBookmarked
+        guard (try? writeMetadata(nextMetadata)) != nil else { return }
+        metadata = nextMetadata
     }
 
     func fileExists(for item: CaptureItem) -> Bool {
@@ -288,6 +300,10 @@ final class CaptureStorage {
     }
 
     private func writeMetadata() throws {
+        try writeMetadata(metadata)
+    }
+
+    private func writeMetadata(_ metadata: CaptureMetadata) throws {
         let data = try JSONEncoder.trace.encode(metadata)
         try AtomicFileWriter.write(data, to: metadataURL(rootURL: settingsStore.rootURL))
     }

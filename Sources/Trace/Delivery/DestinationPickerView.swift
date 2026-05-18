@@ -11,28 +11,11 @@ struct DestinationPickerView: View {
     ]
 
     var body: some View {
-        DeliveryPanel {
-            HStack(alignment: .center, spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("앱으로 전달")
-                        .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    Text("Command+Tab처럼 실행 중인 앱을 고른 뒤, 붙여넣을 윈도우를 선택합니다.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("건너뛰기", action: onSkip)
-                    .keyboardShortcut(.cancelAction)
-                    .buttonStyle(SecondaryCapsuleButtonStyle())
-            }
-            .padding(.horizontal, 26)
-            .padding(.top, 24)
-            .padding(.bottom, 18)
-
+        ZStack {
             if destinations.isEmpty {
-                Spacer(minLength: 0)
                 ContentUnavailableView("실행 중인 앱 없음", systemImage: "app.dashed")
-                Spacer(minLength: 0)
+                    .padding(28)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 14) {
@@ -45,12 +28,13 @@ struct DestinationPickerView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
+                    .padding(6)
                 }
+                .scrollIndicators(.never)
             }
         }
-        .frame(minWidth: 720, minHeight: 460)
+        .padding(.horizontal, 4)
+        .onExitCommand(perform: onSkip)
     }
 }
 

@@ -196,8 +196,8 @@ final class AppController {
             }
         )
 
-        destinationWindow = makeWindow(title: "전달 대상 선택", size: NSSize(width: 760, height: 540), rootView: view)
-        showWindow(destinationWindow, minimumSize: NSSize(width: 720, height: 520))
+        destinationWindow = makeDeliveryOverlayWindow(size: destinationPickerSize(for: destinations), rootView: view)
+        showDeliveryOverlayWindow(destinationWindow)
     }
 
     private func presentWindowPicker(for saved: SavedCapture?, destination: AppDestination) async {
@@ -228,8 +228,14 @@ final class AppController {
             }
         )
 
-        destinationWindow?.contentViewController = NSHostingController(rootView: view)
-        showWindow(destinationWindow, minimumSize: NSSize(width: 720, height: 520))
+        if destinationWindow == nil {
+            destinationWindow = makeDeliveryOverlayWindow(size: NSSize(width: 760, height: 540), rootView: view)
+        } else {
+            destinationWindow?.contentViewController = NSHostingController(rootView: view)
+            destinationWindow?.setContentSize(NSSize(width: 760, height: 540))
+            destinationWindow?.center()
+        }
+        showDeliveryOverlayWindow(destinationWindow)
     }
 
     private func prepareAccessibilityForDelivery(saved: SavedCapture?) -> Bool {
@@ -344,6 +350,44 @@ final class AppController {
         return window
     }
 
+    private func makeDeliveryOverlayWindow<Content: View>(size: NSSize, rootView: Content) -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(origin: .zero, size: size),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.hasShadow = false
+        window.level = .floating
+        window.collectionBehavior = [.moveToActiveSpace, .transient, .fullScreenAuxiliary]
+        window.isMovableByWindowBackground = true
+        window.setContentSize(size)
+        window.center()
+        window.contentViewController = NSHostingController(rootView: rootView)
+        return window
+    }
+
+    private func destinationPickerSize(for destinations: [AppDestination]) -> NSSize {
+        guard !destinations.isEmpty else {
+            return NSSize(width: 360, height: 220)
+        }
+
+        let columnCount = min(max(destinations.count, 1), 6)
+        let rowCount = Int(ceil(Double(destinations.count) / Double(columnCount)))
+        let tileWidth: CGFloat = 124
+        let tileHeight: CGFloat = 156
+        let spacing: CGFloat = 14
+        let horizontalPadding: CGFloat = 20
+        let verticalPadding: CGFloat = 16
+        let width = CGFloat(columnCount) * tileWidth + CGFloat(columnCount - 1) * spacing + horizontalPadding
+        let uncappedHeight = CGFloat(rowCount) * tileHeight + CGFloat(max(rowCount - 1, 0)) * spacing + verticalPadding
+        let visibleHeight = NSScreen.main?.visibleFrame.height ?? 720
+        return NSSize(width: width, height: min(uncappedHeight, visibleHeight * 0.78))
+    }
+
     private func showWindow(_ window: NSWindow?, minimumSize: NSSize) {
         guard let window else { return }
         window.minSize = minimumSize
@@ -360,6 +404,12 @@ final class AppController {
             window.center()
         }
 
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func showDeliveryOverlayWindow(_ window: NSWindow?) {
+        guard let window else { return }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
