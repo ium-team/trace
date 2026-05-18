@@ -51,10 +51,6 @@ final class AppController {
 
         menu.addItem(.separator())
 
-        let forceQuitItem = NSMenuItem(title: "캡처 취소 후 종료", action: #selector(forceQuitFromMenu), keyEquivalent: "")
-        forceQuitItem.target = self
-        menu.addItem(forceQuitItem)
-
         let quitItem = NSMenuItem(title: "종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quitItem.target = NSApp
         menu.addItem(quitItem)
@@ -77,11 +73,6 @@ final class AppController {
 
     @objc private func cancelCaptureFromMenu() {
         captureController.forceCancelActiveOverlay()
-    }
-
-    @objc private func forceQuitFromMenu() {
-        captureController.forceCancelActiveOverlay()
-        NSApp.terminate(nil)
     }
 
     @objc private func openHistoryFromMenu() {
