@@ -11,29 +11,48 @@ struct DestinationPickerView: View {
     ]
 
     var body: some View {
-        ZStack {
-            if destinations.isEmpty {
-                ContentUnavailableView("실행 중인 앱 없음", systemImage: "app.dashed")
-                    .padding(28)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 14) {
-                        ForEach(destinations) { destination in
-                            Button {
-                                onSelect(destination)
-                            } label: {
-                                AppSwitcherTile(destination: destination)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(6)
+        DeliveryPanel {
+            HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("앱으로 전달")
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    Text("실행 중인 앱을 고르고 전달할 대상을 선택합니다.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
-                .scrollIndicators(.never)
+                Spacer()
+                Button("건너뛰기", action: onSkip)
+                    .keyboardShortcut(.cancelAction)
+                    .buttonStyle(SecondaryCapsuleButtonStyle())
+            }
+            .padding(.horizontal, 26)
+            .padding(.top, 24)
+            .padding(.bottom, 18)
+
+            ZStack {
+                if destinations.isEmpty {
+                    ContentUnavailableView("실행 중인 앱 없음", systemImage: "app.dashed")
+                        .padding(28)
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: 14) {
+                            ForEach(destinations) { destination in
+                                Button {
+                                    onSelect(destination)
+                                } label: {
+                                    AppSwitcherTile(destination: destination)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+                    }
+                    .scrollIndicators(.never)
+                }
             }
         }
-        .padding(.horizontal, 4)
+        .frame(minWidth: 720, minHeight: 460)
         .onExitCommand(perform: onSkip)
     }
 }

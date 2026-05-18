@@ -196,7 +196,14 @@ final class AppController {
             }
         )
 
-        destinationWindow = makeDeliveryOverlayWindow(size: destinationPickerSize(for: destinations), rootView: view)
+        let size = destinationPickerSize(for: destinations)
+        if destinationWindow == nil {
+            destinationWindow = makeDeliveryOverlayWindow(size: size, rootView: view)
+        } else {
+            destinationWindow?.contentViewController = NSHostingController(rootView: view)
+            destinationWindow?.setContentSize(size)
+            destinationWindow?.center()
+        }
         showDeliveryOverlayWindow(destinationWindow)
     }
 
