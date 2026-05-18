@@ -84,8 +84,7 @@ final class AppController {
         } else {
             captureLauncherWindow?.contentViewController = NSHostingController(rootView: view)
         }
-        captureLauncherWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        showWindow(captureLauncherWindow, minimumSize: NSSize(width: 600, height: 390))
     }
 
     func startCapture(mode: CaptureMode? = nil, scope: CaptureScope = .area) {
@@ -168,9 +167,8 @@ final class AppController {
             }
         )
 
-        destinationWindow = makeWindow(title: "전달 대상 선택", size: NSSize(width: 380, height: 460), rootView: view)
-        destinationWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        destinationWindow = makeWindow(title: "전달 대상 선택", size: NSSize(width: 420, height: 520), rootView: view)
+        showWindow(destinationWindow, minimumSize: NSSize(width: 420, height: 520))
     }
 
     private func deliver(saved: SavedCapture, to destination: AppDestination) async {
@@ -198,23 +196,21 @@ final class AppController {
         storage.reload()
         let view = HistoryView(storage: storage)
         if historyWindow == nil {
-            historyWindow = makeWindow(title: "Trace 히스토리", size: NSSize(width: 920, height: 640), rootView: view)
+            historyWindow = makeWindow(title: "Trace 히스토리", size: NSSize(width: 1080, height: 720), rootView: view)
         } else {
             historyWindow?.contentViewController = NSHostingController(rootView: view)
         }
-        historyWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        showWindow(historyWindow, minimumSize: NSSize(width: 900, height: 620))
     }
 
     private func openSettings() {
         let view = SettingsView(settingsStore: settingsStore)
         if settingsWindow == nil {
-            settingsWindow = makeWindow(title: "Trace 설정", size: NSSize(width: 560, height: 420), rootView: view)
+            settingsWindow = makeWindow(title: "Trace 설정", size: NSSize(width: 680, height: 520), rootView: view)
         } else {
             settingsWindow?.contentViewController = NSHostingController(rootView: view)
         }
-        settingsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        showWindow(settingsWindow, minimumSize: NSSize(width: 620, height: 480))
     }
 
     private func makeWindow<Content: View>(title: String, size: NSSize, rootView: Content) -> NSWindow {
@@ -226,9 +222,32 @@ final class AppController {
         )
         window.title = title
         window.isReleasedWhenClosed = false
+        window.minSize = size
+        window.contentMinSize = size
+        window.setContentSize(size)
         window.center()
         window.contentViewController = NSHostingController(rootView: rootView)
         return window
+    }
+
+    private func showWindow(_ window: NSWindow?, minimumSize: NSSize) {
+        guard let window else { return }
+        window.minSize = minimumSize
+        window.contentMinSize = minimumSize
+
+        let contentSize = window.contentLayoutRect.size
+        if contentSize.width < minimumSize.width || contentSize.height < minimumSize.height {
+            window.setContentSize(
+                NSSize(
+                    width: max(contentSize.width, minimumSize.width),
+                    height: max(contentSize.height, minimumSize.height)
+                )
+            )
+            window.center()
+        }
+
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func showPermissionAlert(message: String, info: String, openAction: () -> Void) {

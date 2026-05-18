@@ -45,6 +45,7 @@ struct HistoryView: View {
         } message: {
             Text(message ?? "")
         }
+        .frame(minWidth: 900, minHeight: 620)
     }
 }
 
@@ -141,8 +142,10 @@ struct CapturePreview: View {
                 }
             } else {
                 ContentUnavailableView("파일을 찾을 수 없음", systemImage: "exclamationmark.triangle")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .frame(minWidth: 560, minHeight: 420)
     }
 
     private func copy() {

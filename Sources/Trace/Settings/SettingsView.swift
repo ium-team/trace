@@ -59,6 +59,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
+        .frame(minWidth: 620, minHeight: 480)
         .onChange(of: settingsStore.settings) { _, newValue in
             draft = newValue
         }

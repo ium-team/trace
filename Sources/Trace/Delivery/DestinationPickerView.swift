@@ -49,5 +49,6 @@ struct DestinationPickerView: View {
                 }
             }
         }
+        .frame(minWidth: 420, minHeight: 520)
     }
 }
