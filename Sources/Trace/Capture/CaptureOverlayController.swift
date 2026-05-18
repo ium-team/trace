@@ -38,6 +38,7 @@ final class CaptureOverlayController {
         sessions = NSScreen.screens.map { screen in
             let view = CaptureOverlayView(frame: NSRect(origin: .zero, size: screen.frame.size))
             view.plan = defaultPlan
+            view.bottomSafeInset = max(0, screen.visibleFrame.minY - screen.frame.minY)
             let window = OverlayPanel(
                 contentRect: screen.frame,
                 styleMask: [.borderless],
@@ -296,10 +297,16 @@ final class CaptureOverlayView: NSView {
 
     private var dragStart: CGPoint?
     private var dragCurrent: CGPoint?
+    fileprivate var bottomSafeInset: CGFloat = 0 {
+        didSet {
+            updateToolbarPosition()
+        }
+    }
     private let scopeControl = NSSegmentedControl(labels: CaptureScope.allCases.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
     private let modeControl = NSSegmentedControl(labels: CaptureMode.allCases.map(\.title), trackingMode: .selectOne, target: nil, action: nil)
     private let captureButton = NSButton(title: "캡처", target: nil, action: nil)
     private let cancelButton = NSButton(title: "취소", target: nil, action: nil)
+    private var toolbarBottomConstraint: NSLayoutConstraint?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -428,15 +435,27 @@ final class CaptureOverlayView: NSView {
         cancelButton.keyEquivalent = "\u{1b}"
         cancelButton.refusesFirstResponder = true
 
+        let bottomConstraint = toolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -toolbarBottomOffset)
+        toolbarBottomConstraint = bottomConstraint
+
         NSLayoutConstraint.activate([
             toolbar.centerXAnchor.constraint(equalTo: centerXAnchor),
-            toolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -28),
+            bottomConstraint,
             stack.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor, constant: 12),
             stack.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -12),
             stack.topAnchor.constraint(equalTo: toolbar.topAnchor, constant: 10),
             stack.bottomAnchor.constraint(equalTo: toolbar.bottomAnchor, constant: -10)
         ])
         updateControls()
+    }
+
+    private var toolbarBottomOffset: CGFloat {
+        max(28, bottomSafeInset + 18)
+    }
+
+    private func updateToolbarPosition() {
+        toolbarBottomConstraint?.constant = -toolbarBottomOffset
+        needsLayout = true
     }
 
     private func updateControls() {
