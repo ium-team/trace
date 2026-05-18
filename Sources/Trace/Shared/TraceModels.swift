@@ -186,6 +186,20 @@ struct AppDestination: Identifiable, Hashable {
     var application: NSRunningApplication
 }
 
+struct AppWindowDestination: Identifiable {
+    let id = UUID()
+    var title: String
+    var isMain: Bool
+    var accessibilityElement: AXUIElement
+}
+
+struct AppSpecificDestination: Identifiable {
+    let id = UUID()
+    var title: String
+    var detail: String?
+    var focus: @MainActor () async throws -> Void
+}
+
 enum TraceError: LocalizedError {
     case screenRecordingRequired
     case captureCancelled

@@ -155,13 +155,42 @@ final class AppController {
                 self?.openHistory()
             },
             onSelect: { [weak self] destination in
-                Task { @MainActor in
-                    await self?.deliver(saved: saved, to: destination)
-                }
+                self?.presentWindowPicker(for: saved, destination: destination)
             }
         )
 
         destinationWindow = makeWindow(title: "전달 대상 선택", size: NSSize(width: 420, height: 520), rootView: view)
+        showWindow(destinationWindow, minimumSize: NSSize(width: 420, height: 520))
+    }
+
+    private func presentWindowPicker(for saved: SavedCapture, destination: AppDestination) {
+        let windows = deliveryService.windows(for: destination)
+        let appSpecificDestinations = deliveryService.appSpecificDestinations(for: destination)
+        let view = WindowPickerView(
+            app: destination,
+            windows: windows,
+            appSpecificDestinations: appSpecificDestinations,
+            onBack: { [weak self] in
+                self?.presentDestinationPicker(for: saved)
+            },
+            onSkip: { [weak self] in
+                self?.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .skipped)
+                self?.destinationWindow?.close()
+                self?.openHistory()
+            },
+            onSelectWindow: { [weak self] window in
+                Task { @MainActor in
+                    await self?.deliver(saved: saved, to: destination, window: window)
+                }
+            },
+            onSelectAppSpecificDestination: { [weak self] appSpecificDestination in
+                Task { @MainActor in
+                    await self?.deliver(saved: saved, to: destination, appSpecificTarget: appSpecificDestination)
+                }
+            }
+        )
+
+        destinationWindow?.contentViewController = NSHostingController(rootView: view)
         showWindow(destinationWindow, minimumSize: NSSize(width: 420, height: 520))
     }
 
@@ -181,10 +210,34 @@ final class AppController {
         return false
     }
 
-    private func deliver(saved: SavedCapture, to destination: AppDestination) async {
+    private func deliver(saved: SavedCapture, to destination: AppDestination, window: AppWindowDestination) async {
         destinationWindow?.close()
         do {
-            try await deliveryService.deliver(to: destination)
+            try await deliveryService.deliver(to: destination, window: window)
+            storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .delivered)
+            TraceNotificationCenter.showDeliveryCompleted(
+                appName: destination.name,
+                enabled: true
+            )
+        } catch {
+            storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .failed)
+            if case TraceError.accessibilityRequired = error {
+                PermissionService.requestAccessibilityPermission()
+            } else {
+                TraceNotificationCenter.showDeliveryFailed(
+                    appName: destination.name,
+                    message: error.localizedDescription,
+                    enabled: true
+                )
+            }
+            openHistory()
+        }
+    }
+
+    private func deliver(saved: SavedCapture, to destination: AppDestination, appSpecificTarget: AppSpecificDestination) async {
+        destinationWindow?.close()
+        do {
+            try await deliveryService.deliver(to: destination, appSpecificTarget: appSpecificTarget)
             storage.updateDelivery(itemID: saved.item.id, appName: destination.name, state: .delivered)
             TraceNotificationCenter.showDeliveryCompleted(
                 appName: destination.name,

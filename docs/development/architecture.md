@@ -145,6 +145,14 @@ icon
 isActive
 ```
 
+### AppWindowDestination
+
+```text
+title
+isMain
+accessibilityElement
+```
+
 ### Settings
 
 ```text
@@ -176,6 +184,7 @@ GlobalShortcut
   -> Storage.save
   -> Clipboard.copy
   -> DeliveryDestinationPicker
+  -> DeliveryWindowPicker
   -> Delivery.deliver
   -> History.refresh
 ```
