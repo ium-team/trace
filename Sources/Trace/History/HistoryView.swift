@@ -3,24 +3,40 @@ import SwiftUI
 
 struct HistoryView: View {
     @Bindable var storage: CaptureStorage
-    @State private var selectedItem: CaptureItem?
+    @State private var selectedItemID: CaptureItem.ID?
     @State private var message: String?
+    @State private var pendingName = ""
+    @State private var isShowingDeleteConfirmation = false
+
+    private var selectedItem: CaptureItem? {
+        guard let selectedItemID else { return nil }
+        return storage.capture(withID: selectedItemID)
+    }
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $selectedItem) {
+            List(selection: $selectedItemID) {
+                if !storage.pinnedCaptures.isEmpty {
+                    Section("고정") {
+                        ForEach(storage.pinnedCaptures) { item in
+                            HistoryRow(item: item, storage: storage)
+                                .tag(item.id)
+                        }
+                    }
+                }
+
                 Section("최근 캡처") {
-                    ForEach(storage.captures.prefix(8), id: \.self) { item in
+                    ForEach(storage.captures.filter { !$0.isPinned }.prefix(8)) { item in
                         HistoryRow(item: item, storage: storage)
-                            .tag(item)
+                            .tag(item.id)
                     }
                 }
 
                 ForEach(storage.groupedByDay(), id: \.0) { day, items in
                     Section(day) {
-                        ForEach(items, id: \.self) { item in
+                        ForEach(items.filter { !$0.isPinned }) { item in
                             HistoryRow(item: item, storage: storage)
-                                .tag(item)
+                                .tag(item.id)
                         }
                     }
                 }
@@ -28,7 +44,14 @@ struct HistoryView: View {
             .frame(minWidth: 330)
         } detail: {
             if let selectedItem {
-                CapturePreview(item: selectedItem, storage: storage, message: $message)
+                CapturePreview(
+                    item: selectedItem,
+                    storage: storage,
+                    pendingName: $pendingName,
+                    message: $message,
+                    isShowingDeleteConfirmation: $isShowingDeleteConfirmation,
+                    onDeleted: selectLatestCaptureAfterDelete
+                )
             } else {
                 ContentUnavailableView("캡처 선택", systemImage: "photo.on.rectangle")
             }
@@ -49,19 +72,33 @@ struct HistoryView: View {
             selectLatestCaptureIfNeeded(force: false)
         }
         .onChange(of: storage.captures) { _, _ in
-            if let selectedItem, storage.captures.contains(selectedItem) {
+            if let selectedItemID, storage.capture(withID: selectedItemID) != nil {
+                syncPendingName()
                 return
             }
             selectLatestCaptureIfNeeded(force: true)
+        }
+        .onChange(of: selectedItemID) { _, _ in
+            syncPendingName()
         }
         .frame(minWidth: 900, minHeight: 620)
     }
 
     private func selectLatestCaptureIfNeeded(force: Bool) {
-        if !force && selectedItem != nil {
+        if !force && selectedItemID != nil {
             return
         }
-        selectedItem = storage.captures.first
+        selectedItemID = storage.captures.first?.id
+        syncPendingName()
+    }
+
+    private func selectLatestCaptureAfterDelete() {
+        selectedItemID = storage.captures.first?.id
+        syncPendingName()
+    }
+
+    private func syncPendingName() {
+        pendingName = selectedItem?.displayTitle ?? ""
     }
 }
 
@@ -81,13 +118,25 @@ struct HistoryRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
-                    Text(TraceDateFormatters.displayTime.string(from: item.createdAt))
+                    Text(item.displayTitle)
+                        .fontWeight(item.isPinned ? .semibold : .regular)
+                    if item.isPinned {
+                        Image(systemName: "pin.fill")
+                            .foregroundStyle(.orange)
+                    }
+                    if item.isBookmarked {
+                        Image(systemName: "bookmark.fill")
+                            .foregroundStyle(.blue)
+                    }
                     if !storage.fileExists(for: item) {
                         Text("누락")
                             .foregroundStyle(.red)
                     }
                 }
                 .font(.callout)
+                Text(TraceDateFormatters.displayTime.string(from: item.createdAt))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Text(item.filePath)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -120,19 +169,43 @@ struct HistoryRow: View {
 struct CapturePreview: View {
     let item: CaptureItem
     let storage: CaptureStorage
+    @Binding var pendingName: String
     @Binding var message: String?
+    @Binding var isShowingDeleteConfirmation: Bool
+    let onDeleted: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        TextField("캡처 이름", text: $pendingName)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(minWidth: 240, maxWidth: 360)
+                            .onSubmit(saveName)
+                        Button("저장") {
+                            saveName()
+                        }
+                        .disabled(pendingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
                     Text(TraceDateFormatters.displayDate.string(from: item.createdAt))
-                        .font(.headline)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                     Text(item.filePath)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button {
+                    storage.setPinned(!item.isPinned, itemID: item.id)
+                } label: {
+                    Label(item.isPinned ? "고정 해제" : "고정", systemImage: item.isPinned ? "pin.slash" : "pin")
+                }
+                Button {
+                    storage.setBookmarked(!item.isBookmarked, itemID: item.id)
+                } label: {
+                    Label(item.isBookmarked ? "북마크 해제" : "북마크", systemImage: item.isBookmarked ? "bookmark.slash" : "bookmark")
+                }
                 Button {
                     copy()
                 } label: {
@@ -142,6 +215,11 @@ struct CapturePreview: View {
                     reveal()
                 } label: {
                     Label("Finder", systemImage: "finder")
+                }
+                Button(role: .destructive) {
+                    isShowingDeleteConfirmation = true
+                } label: {
+                    Label("삭제", systemImage: "trash")
                 }
             }
             .padding()
@@ -161,7 +239,26 @@ struct CapturePreview: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .confirmationDialog("이 캡처를 삭제할까요?", isPresented: $isShowingDeleteConfirmation) {
+            Button("삭제", role: .destructive) {
+                delete()
+            }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("원본 이미지, 썸네일, 히스토리 항목이 함께 삭제됩니다.")
+        }
         .frame(minWidth: 560, minHeight: 420)
+    }
+
+    private func saveName() {
+        do {
+            try storage.rename(itemID: item.id, to: pendingName)
+            pendingName = storage.capture(withID: item.id)?.displayTitle ?? pendingName
+            message = "캡처 이름을 변경했습니다."
+        } catch {
+            pendingName = item.displayTitle
+            message = error.localizedDescription
+        }
     }
 
     private func copy() {
@@ -179,6 +276,16 @@ struct CapturePreview: View {
             NSWorkspace.shared.activateFileViewerSelecting([url])
         } else {
             message = "Finder에서 열 파일을 찾을 수 없습니다."
+        }
+    }
+
+    private func delete() {
+        do {
+            try storage.delete(itemID: item.id)
+            message = "캡처를 삭제했습니다."
+            onDeleted()
+        } catch {
+            message = error.localizedDescription
         }
     }
 }

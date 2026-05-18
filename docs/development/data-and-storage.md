@@ -46,6 +46,7 @@ YYYY-MM-DD_HH-mm-ss-3.png
   "captures": [
     {
       "id": "2026-05-17_14-32-08",
+      "title": "2026-05-17_14-32-08",
       "filePath": "captures/2026-05-17/2026-05-17_14-32-08.png",
       "thumbnailPath": "thumbnails/2026-05-17/2026-05-17_14-32-08.jpg",
       "createdAt": "2026-05-17T14:32:08+09:00",
@@ -53,7 +54,9 @@ YYYY-MM-DD_HH-mm-ss-3.png
       "height": 720,
       "captureMode": "deliverToApp",
       "deliveredAppName": "Slack",
-      "deliveryState": "delivered"
+      "deliveryState": "delivered",
+      "isPinned": false,
+      "isBookmarked": false
     }
   ]
 }
@@ -65,6 +68,9 @@ YYYY-MM-DD_HH-mm-ss-3.png
 - 메타데이터 쓰기에 실패해도 원본 PNG 저장이 성공했다면 캡처 파일을 삭제하지 않는다.
 - 앱 시작 시 `metadata.json`이 손상되어 읽을 수 없으면 백업 파일을 만들고 빈 메타데이터로 복구한다.
 - 같은 id가 이미 있으면 파일명 충돌 처리 규칙과 동일하게 suffix를 붙여 새 id를 만든다.
+- 이름 편집은 원본 PNG 파일명과 썸네일 파일명을 함께 변경하고 `filePath`, `thumbnailPath`, `title`을 갱신한다.
+- 삭제는 원본 PNG, 썸네일, 메타데이터 항목을 함께 제거한다.
+- 고정과 북마크는 파일 이동 없이 메타데이터 플래그만 갱신한다.
 
 ## 설정
 

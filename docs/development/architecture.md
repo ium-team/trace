@@ -92,6 +92,9 @@ TraceApp
 - 이미지 미리보기
 - Finder에서 보기
 - 이미지 다시 복사
+- 캡처 이름 편집
+- 캡처 삭제
+- 캡처 고정 및 북마크 토글
 
 ### Settings
 
@@ -120,6 +123,7 @@ deliverToApp
 
 ```text
 id
+title
 filePath
 thumbnailPath
 createdAt
@@ -128,6 +132,8 @@ height
 captureMode
 deliveredAppName
 deliveryState
+isPinned
+isBookmarked
 ```
 
 ### DeliveryState

@@ -20,6 +20,10 @@ final class CaptureStorage {
         metadata.captures.sorted { $0.createdAt > $1.createdAt }
     }
 
+    var pinnedCaptures: [CaptureItem] {
+        captures.filter(\.isPinned)
+    }
+
     func reload() {
         metadata = Self.loadMetadata(rootURL: settingsStore.rootURL, fileManager: fileManager)
     }
@@ -102,6 +106,86 @@ final class CaptureStorage {
         try? writeMetadata()
     }
 
+    func capture(withID itemID: String) -> CaptureItem? {
+        metadata.captures.first { $0.id == itemID }
+    }
+
+    func rename(itemID: String, to proposedName: String) throws {
+        guard let index = metadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
+        let cleanName = sanitizedFileBaseName(proposedName)
+        guard !cleanName.isEmpty else {
+            throw TraceError.invalidCaptureName
+        }
+
+        let rootURL = settingsStore.rootURL
+        let originalImageURL = absoluteURL(for: metadata.captures[index].filePath)
+        let targetImageURL = uniqueURL(
+            directory: originalImageURL.deletingLastPathComponent(),
+            baseName: cleanName,
+            extension: originalImageURL.pathExtension.isEmpty ? "png" : originalImageURL.pathExtension,
+            excluding: originalImageURL
+        )
+
+        if originalImageURL.standardizedFileURL != targetImageURL.standardizedFileURL,
+           fileManager.fileExists(atPath: originalImageURL.path) {
+            try fileManager.moveItem(at: originalImageURL, to: targetImageURL)
+            metadata.captures[index].filePath = targetImageURL.relativePath(from: rootURL)
+        }
+
+        if let thumbnailPath = metadata.captures[index].thumbnailPath {
+            let originalThumbnailURL = absoluteURL(for: thumbnailPath)
+            if fileManager.fileExists(atPath: originalThumbnailURL.path) {
+                let targetThumbnailURL = uniqueURL(
+                    directory: originalThumbnailURL.deletingLastPathComponent(),
+                    baseName: targetImageURL.deletingPathExtension().lastPathComponent,
+                    extension: originalThumbnailURL.pathExtension.isEmpty ? "jpg" : originalThumbnailURL.pathExtension,
+                    excluding: originalThumbnailURL
+                )
+                if originalThumbnailURL.standardizedFileURL != targetThumbnailURL.standardizedFileURL {
+                    try? fileManager.moveItem(at: originalThumbnailURL, to: targetThumbnailURL)
+                    if fileManager.fileExists(atPath: targetThumbnailURL.path) {
+                        metadata.captures[index].thumbnailPath = targetThumbnailURL.relativePath(from: rootURL)
+                    }
+                }
+            }
+        }
+
+        metadata.captures[index].title = cleanName
+        try writeMetadata()
+    }
+
+    func delete(itemID: String) throws {
+        guard let index = metadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
+        let item = metadata.captures[index]
+
+        let imageURL = absoluteURL(for: item.filePath)
+        if fileManager.fileExists(atPath: imageURL.path) {
+            try fileManager.removeItem(at: imageURL)
+        }
+
+        if let thumbnailPath = item.thumbnailPath {
+            let thumbnailURL = absoluteURL(for: thumbnailPath)
+            if fileManager.fileExists(atPath: thumbnailURL.path) {
+                try? fileManager.removeItem(at: thumbnailURL)
+            }
+        }
+
+        metadata.captures.remove(at: index)
+        try writeMetadata()
+    }
+
+    func setPinned(_ isPinned: Bool, itemID: String) {
+        guard let index = metadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
+        metadata.captures[index].isPinned = isPinned
+        try? writeMetadata()
+    }
+
+    func setBookmarked(_ isBookmarked: Bool, itemID: String) {
+        guard let index = metadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
+        metadata.captures[index].isBookmarked = isBookmarked
+        try? writeMetadata()
+    }
+
     func fileExists(for item: CaptureItem) -> Bool {
         fileManager.fileExists(atPath: absoluteURL(for: item.filePath).path)
     }
@@ -115,27 +199,44 @@ final class CaptureStorage {
             .sorted { $0.0 > $1.0 }
     }
 
-    private func uniqueURL(directory: URL, baseName: String, extension fileExtension: String) -> URL {
+    private func uniqueURL(
+        directory: URL,
+        baseName: String,
+        extension fileExtension: String,
+        excluding excludedURL: URL? = nil
+    ) -> URL {
         var suffix = 1
+        let excludedPath = excludedURL?.standardizedFileURL.path
         while true {
             let name = suffix == 1 ? baseName : "\(baseName)-\(suffix)"
             let url = directory.appendingPathComponent(name).appendingPathExtension(fileExtension)
-            if !fileManager.fileExists(atPath: url.path) {
+            if url.standardizedFileURL.path == excludedPath || !fileManager.fileExists(atPath: url.path) {
                 return url
             }
             suffix += 1
         }
     }
 
-    private func uniqueID(baseID: String) -> String {
+    private func uniqueID(baseID: String, excluding excludedID: String? = nil) -> String {
         var candidate = baseID
         var suffix = 2
-        let existing = Set(metadata.captures.map(\.id))
+        let existing = Set(metadata.captures.map(\.id).filter { $0 != excludedID })
         while existing.contains(candidate) {
             candidate = "\(baseID)-\(suffix)"
             suffix += 1
         }
         return candidate
+    }
+
+    private func sanitizedFileBaseName(_ name: String) -> String {
+        let forbidden = CharacterSet(charactersIn: "/:\\")
+            .union(.newlines)
+            .union(.controlCharacters)
+        return name
+            .components(separatedBy: forbidden)
+            .joined(separator: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
     }
 
     private func makeBaseName(date: Date, capturesDirectory: URL) -> String {

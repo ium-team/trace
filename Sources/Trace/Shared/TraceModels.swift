@@ -113,6 +113,7 @@ enum DeliveryState: String, Codable, CaseIterable {
 
 struct CaptureItem: Identifiable, Codable, Hashable {
     var id: String
+    var title: String?
     var filePath: String
     var thumbnailPath: String?
     var createdAt: Date
@@ -121,6 +122,74 @@ struct CaptureItem: Identifiable, Codable, Hashable {
     var captureMode: CaptureMode
     var deliveredAppName: String?
     var deliveryState: DeliveryState
+    var isPinned: Bool
+    var isBookmarked: Bool
+
+    var displayTitle: String {
+        guard let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else {
+            return URL(fileURLWithPath: filePath).deletingPathExtension().lastPathComponent
+        }
+        return title
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case filePath
+        case thumbnailPath
+        case createdAt
+        case width
+        case height
+        case captureMode
+        case deliveredAppName
+        case deliveryState
+        case isPinned
+        case isBookmarked
+    }
+
+    init(
+        id: String,
+        title: String? = nil,
+        filePath: String,
+        thumbnailPath: String?,
+        createdAt: Date,
+        width: Int,
+        height: Int,
+        captureMode: CaptureMode,
+        deliveredAppName: String?,
+        deliveryState: DeliveryState,
+        isPinned: Bool = false,
+        isBookmarked: Bool = false
+    ) {
+        self.id = id
+        self.title = title
+        self.filePath = filePath
+        self.thumbnailPath = thumbnailPath
+        self.createdAt = createdAt
+        self.width = width
+        self.height = height
+        self.captureMode = captureMode
+        self.deliveredAppName = deliveredAppName
+        self.deliveryState = deliveryState
+        self.isPinned = isPinned
+        self.isBookmarked = isBookmarked
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        filePath = try container.decode(String.self, forKey: .filePath)
+        thumbnailPath = try container.decodeIfPresent(String.self, forKey: .thumbnailPath)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        width = try container.decode(Int.self, forKey: .width)
+        height = try container.decode(Int.self, forKey: .height)
+        captureMode = try container.decode(CaptureMode.self, forKey: .captureMode)
+        deliveredAppName = try container.decodeIfPresent(String.self, forKey: .deliveredAppName)
+        deliveryState = try container.decode(DeliveryState.self, forKey: .deliveryState)
+        isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+        isBookmarked = try container.decodeIfPresent(Bool.self, forKey: .isBookmarked) ?? false
+    }
 }
 
 struct CaptureMetadata: Codable {
@@ -377,6 +446,7 @@ enum TraceError: LocalizedError {
     case accessibilityRequired
     case deliveryFailed(String)
     case saveFailed(String)
+    case invalidCaptureName
 
     var errorDescription: String? {
         switch self {
@@ -398,6 +468,8 @@ enum TraceError: LocalizedError {
             message
         case .saveFailed(let message):
             message
+        case .invalidCaptureName:
+            "사용할 수 있는 캡처 이름을 입력하세요."
         }
     }
 }

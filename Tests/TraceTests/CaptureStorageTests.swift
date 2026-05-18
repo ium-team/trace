@@ -75,6 +75,43 @@ final class CaptureStorageTests: XCTestCase {
         XCTAssertEqual(backups.count, 1)
     }
 
+    func testRenameMovesCaptureAndUpdatesMetadata() throws {
+        let storage = makeStorage()
+        let date = ISO8601DateFormatter().date(from: "2026-05-17T14:32:08+09:00")!
+        let saved = try storage.save(image: testImage(), mode: .copyOnly, date: date)
+
+        try storage.rename(itemID: saved.item.id, to: "Edited Capture")
+
+        let item = try XCTUnwrap(storage.capture(withID: saved.item.id))
+        XCTAssertEqual(item.title, "Edited Capture")
+        XCTAssertEqual(item.filePath, "captures/2026-05-17/Edited Capture.png")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: saved.fileURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: temporaryRoot.appendingPathComponent(item.filePath).path))
+    }
+
+    func testDeleteRemovesFilesAndMetadata() throws {
+        let storage = makeStorage()
+        let saved = try storage.save(image: testImage(), mode: .copyOnly)
+
+        try storage.delete(itemID: saved.item.id)
+
+        XCTAssertNil(storage.capture(withID: saved.item.id))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: saved.fileURL.path))
+    }
+
+    func testPinnedAndBookmarkedArePersisted() throws {
+        let storage = makeStorage()
+        let saved = try storage.save(image: testImage(), mode: .copyOnly)
+
+        storage.setPinned(true, itemID: saved.item.id)
+        storage.setBookmarked(true, itemID: saved.item.id)
+
+        let item = try XCTUnwrap(storage.capture(withID: saved.item.id))
+        XCTAssertTrue(item.isPinned)
+        XCTAssertTrue(item.isBookmarked)
+        XCTAssertEqual(storage.pinnedCaptures.map(\.id), [saved.item.id])
+    }
+
     private func makeStorage() -> CaptureStorage {
         let settings = TraceSettings(
             saveDirectory: temporaryRoot.path,
