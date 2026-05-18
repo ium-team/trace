@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import Carbon
 import Foundation
+import ScreenCaptureKit
 
 @MainActor
 protocol DeliveryAdapter {
@@ -38,7 +39,36 @@ final class DeliveryService {
             }
     }
 
-    func windows(for destination: AppDestination) -> [AppWindowDestination] {
+    func windows(for destination: AppDestination) async -> [AppWindowDestination] {
+        let visibleWindows = sessionWindows(for: destination)
+        let accessibilityWindows = accessibilityWindows(for: destination)
+        let thumbnails = await windowThumbnails(for: visibleWindows.map(\.windowID))
+
+        var results = visibleWindows.map { visibleWindow in
+            let accessibilityElement = visibleWindow.accessibilityElement
+                ?? accessibilityWindows.first(where: { $0.title == visibleWindow.title })?.accessibilityElement
+            return AppWindowDestination(
+                title: visibleWindow.title,
+                isMain: accessibilityElement.map {
+                    boolAttribute(kAXMainAttribute as CFString, from: $0)
+                } ?? false,
+                accessibilityElement: accessibilityElement,
+                windowID: visibleWindow.windowID,
+                thumbnail: thumbnails[visibleWindow.windowID]
+            )
+        }
+
+        let existingTitles = Set(results.map(\.title))
+        let hiddenAccessibilityWindows = accessibilityWindows.filter { !existingTitles.contains($0.title) }
+        results.append(contentsOf: hiddenAccessibilityWindows)
+
+        return results.sorted {
+            if $0.isMain != $1.isMain { return $0.isMain && !$1.isMain }
+            return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+        }
+    }
+
+    private func accessibilityWindows(for destination: AppDestination) -> [AppWindowDestination] {
         let applicationElement = AXUIElementCreateApplication(destination.application.processIdentifier)
         var rawWindows: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(applicationElement, kAXWindowsAttribute as CFString, &rawWindows)
@@ -50,12 +80,10 @@ final class DeliveryService {
             AppWindowDestination(
                 title: windowTitle(for: window, fallbackIndex: index),
                 isMain: boolAttribute(kAXMainAttribute as CFString, from: window),
-                accessibilityElement: window
+                accessibilityElement: window,
+                windowID: nil,
+                thumbnail: nil
             )
-        }
-        .sorted {
-            if $0.isMain != $1.isMain { return $0.isMain && !$1.isMain }
-            return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
         }
     }
 
@@ -111,9 +139,98 @@ final class DeliveryService {
     }
 
     private func focus(_ window: AppWindowDestination) {
-        AXUIElementSetAttributeValue(window.accessibilityElement, kAXMainAttribute as CFString, kCFBooleanTrue)
-        AXUIElementSetAttributeValue(window.accessibilityElement, kAXFocusedAttribute as CFString, kCFBooleanTrue)
-        AXUIElementPerformAction(window.accessibilityElement, kAXRaiseAction as CFString)
+        guard let accessibilityElement = window.accessibilityElement else { return }
+        AXUIElementSetAttributeValue(accessibilityElement, kAXMainAttribute as CFString, kCFBooleanTrue)
+        AXUIElementSetAttributeValue(accessibilityElement, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        AXUIElementPerformAction(accessibilityElement, kAXRaiseAction as CFString)
+    }
+
+    private func sessionWindows(for destination: AppDestination) -> [VisibleWindow] {
+        guard let rawWindows = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]]
+        else {
+            return []
+        }
+
+        let targetPID = destination.application.processIdentifier
+        return rawWindows.compactMap { rawWindow in
+            guard let ownerPID = rawWindow[kCGWindowOwnerPID as String] as? pid_t,
+                  ownerPID == targetPID,
+                  let layer = rawWindow[kCGWindowLayer as String] as? Int,
+                  layer == 0,
+                  let windowNumber = rawWindow[kCGWindowNumber as String] as? NSNumber,
+                  let boundsDictionary = rawWindow[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: boundsDictionary)
+            else {
+                return nil
+            }
+
+            let title = (rawWindow[kCGWindowName as String] as? String)
+                .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+                ?? "제목 없는 윈도우"
+
+            return VisibleWindow(
+                title: title,
+                windowID: CGWindowID(windowNumber.uint32Value),
+                accessibilityElement: isOnScreen(rawWindow)
+                    ? accessibilityWindow(at: CGPoint(x: bounds.midX, y: bounds.midY))
+                    : nil
+            )
+        }
+    }
+
+    private func windowThumbnails(for windowIDs: [CGWindowID]) async -> [CGWindowID: NSImage] {
+        guard PermissionService.hasScreenRecordingPermission,
+              !windowIDs.isEmpty,
+              let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
+        else {
+            return [:]
+        }
+
+        let windowsByID = Dictionary(uniqueKeysWithValues: content.windows.map { ($0.windowID, $0) })
+        var thumbnails: [CGWindowID: NSImage] = [:]
+        for windowID in windowIDs {
+            guard let window = windowsByID[windowID],
+                  let image = try? await thumbnail(for: window)
+            else {
+                continue
+            }
+            thumbnails[windowID] = image
+        }
+        return thumbnails
+    }
+
+    private func thumbnail(for window: SCWindow) async throws -> NSImage {
+        let configuration = SCStreamConfiguration()
+        configuration.width = 240
+        configuration.height = 150
+        configuration.scalesToFit = true
+        configuration.showsCursor = false
+
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+        return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+    }
+
+    private func isOnScreen(_ rawWindow: [String: Any]) -> Bool {
+        rawWindow[kCGWindowIsOnscreen as String] as? Bool == true
+    }
+
+    private func accessibilityWindow(at point: CGPoint) -> AXUIElement? {
+        let systemWideElement = AXUIElementCreateSystemWide()
+        var element: AXUIElement?
+        let hitTestResult = AXUIElementCopyElementAtPosition(
+            systemWideElement,
+            Float(point.x),
+            Float(point.y),
+            &element
+        )
+        guard hitTestResult == .success, let element else { return nil }
+
+        var rawWindow: CFTypeRef?
+        let windowResult = AXUIElementCopyAttributeValue(element, kAXWindowAttribute as CFString, &rawWindow)
+        guard windowResult == .success, let window = rawWindow else { return nil }
+        return (window as! AXUIElement)
     }
 
     private func windowTitle(for window: AXUIElement, fallbackIndex: Int) -> String {
@@ -146,4 +263,10 @@ final class DeliveryService {
         keyUp.post(tap: .cghidEventTap)
         return true
     }
+}
+
+private struct VisibleWindow {
+    var title: String
+    var windowID: CGWindowID
+    var accessibilityElement: AXUIElement?
 }

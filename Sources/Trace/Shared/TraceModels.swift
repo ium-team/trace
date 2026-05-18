@@ -190,7 +190,9 @@ struct AppWindowDestination: Identifiable {
     let id = UUID()
     var title: String
     var isMain: Bool
-    var accessibilityElement: AXUIElement
+    var accessibilityElement: AXUIElement?
+    var windowID: CGWindowID?
+    var thumbnail: NSImage?
 }
 
 struct AppSpecificDestination: Identifiable {

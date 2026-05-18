@@ -155,7 +155,9 @@ final class AppController {
                 self?.openHistory()
             },
             onSelect: { [weak self] destination in
-                self?.presentWindowPicker(for: saved, destination: destination)
+                Task { @MainActor in
+                    await self?.presentWindowPicker(for: saved, destination: destination)
+                }
             }
         )
 
@@ -163,8 +165,8 @@ final class AppController {
         showWindow(destinationWindow, minimumSize: NSSize(width: 420, height: 520))
     }
 
-    private func presentWindowPicker(for saved: SavedCapture, destination: AppDestination) {
-        let windows = deliveryService.windows(for: destination)
+    private func presentWindowPicker(for saved: SavedCapture, destination: AppDestination) async {
+        let windows = await deliveryService.windows(for: destination)
         let appSpecificDestinations = deliveryService.appSpecificDestinations(for: destination)
         let view = WindowPickerView(
             app: destination,

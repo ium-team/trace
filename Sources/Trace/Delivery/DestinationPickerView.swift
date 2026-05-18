@@ -115,7 +115,8 @@ struct WindowPickerView: View {
                                 Button {
                                     onSelectWindow(window)
                                 } label: {
-                                    HStack {
+                                    HStack(spacing: 12) {
+                                        WindowThumbnailView(image: window.thumbnail)
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(window.title)
                                             if window.isMain {
@@ -137,5 +138,26 @@ struct WindowPickerView: View {
             }
         }
         .frame(minWidth: 420, minHeight: 520)
+    }
+}
+
+private struct WindowThumbnailView: View {
+    let image: NSImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: "macwindow")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 96, height: 60)
+        .background(.quaternary)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
