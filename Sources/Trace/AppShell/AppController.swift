@@ -213,8 +213,8 @@ final class AppController {
             }
         )
 
-        destinationWindow = makeWindow(title: "전달 대상 선택", size: NSSize(width: 420, height: 520), rootView: view)
-        showWindow(destinationWindow, minimumSize: NSSize(width: 420, height: 520))
+        destinationWindow = makeWindow(title: "전달 대상 선택", size: NSSize(width: 760, height: 540), rootView: view)
+        showWindow(destinationWindow, minimumSize: NSSize(width: 720, height: 520))
     }
 
     private func presentWindowPicker(for saved: SavedCapture?, destination: AppDestination) async {
@@ -249,7 +249,7 @@ final class AppController {
         )
 
         destinationWindow?.contentViewController = NSHostingController(rootView: view)
-        showWindow(destinationWindow, minimumSize: NSSize(width: 420, height: 520))
+        showWindow(destinationWindow, minimumSize: NSSize(width: 720, height: 520))
     }
 
     private func prepareAccessibilityForDelivery(saved: SavedCapture?) -> Bool {
