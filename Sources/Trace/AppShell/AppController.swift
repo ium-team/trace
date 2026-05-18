@@ -105,21 +105,6 @@ final class AppController {
         _ = PermissionService.requestScreenRecordingPermission()
 
         guard PermissionService.hasScreenRecordingPermission else {
-            presentPermissionAlert(.screenRecording) { [weak self] action in
-                guard let self else { return }
-                switch action {
-                case .openSettings:
-                    PermissionService.openScreenRecordingSettings()
-                case .retry:
-                    if PermissionService.hasScreenRecordingPermission {
-                        self.performInteractiveCapture(defaultPlan: defaultPlan)
-                    } else {
-                        self.requestScreenRecordingPermissionForCapture(defaultPlan: defaultPlan)
-                    }
-                case .cancel:
-                    break
-                }
-            }
             return
         }
 
@@ -258,25 +243,8 @@ final class AppController {
             return true
         }
 
-        var canDeliver = false
-        presentPermissionAlert(.accessibility) { [weak self] action in
-            guard let self else { return }
-            switch action {
-            case .openSettings:
-                PermissionService.openAccessibilitySettings()
-                self.markDeliveryFailed(saved: saved)
-            case .retry:
-                if PermissionService.hasAccessibilityPermission {
-                    canDeliver = true
-                } else {
-                    PermissionService.requestAccessibilityPermission()
-                    self.markDeliveryFailed(saved: saved)
-                }
-            case .cancel:
-                self.markDeliveryFailed(saved: saved)
-            }
-        }
-        return canDeliver
+        markDeliveryFailed(saved: saved)
+        return false
     }
 
     private func markDeliveryFailed(saved: SavedCapture?) {
@@ -403,63 +371,4 @@ final class AppController {
         alert.runModal()
         TraceNotificationCenter.showFailure(message, enabled: true)
     }
-
-    private func presentPermissionAlert(
-        _ permission: PermissionAlertKind,
-        completion: (PermissionAlertAction) -> Void
-    ) {
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = permission.title
-        alert.informativeText = permission.message
-        alert.addButton(withTitle: "시스템 설정 열기")
-        alert.addButton(withTitle: "다시 확인")
-        alert.addButton(withTitle: "취소")
-
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:
-            completion(.openSettings)
-        case .alertSecondButtonReturn:
-            completion(.retry)
-        default:
-            completion(.cancel)
-        }
-    }
-}
-
-private enum PermissionAlertKind {
-    case screenRecording
-    case accessibility
-
-    var title: String {
-        switch self {
-        case .screenRecording:
-            "화면 캡처 권한이 필요합니다."
-        case .accessibility:
-            "손쉬운 사용 권한이 필요합니다."
-        }
-    }
-
-    var message: String {
-        switch self {
-        case .screenRecording:
-            """
-            Trace가 선택한 영역을 이미지로 저장하려면 Screen Recording 권한이 필요합니다.
-
-            시스템 설정에서 Trace 또는 현재 실행 주체를 허용한 뒤 다시 시도하세요. 권한을 허용한 뒤에도 반영되지 않으면 앱을 재시작해야 할 수 있습니다.
-            """
-        case .accessibility:
-            """
-            앱으로 자동 전달하려면 Accessibility 권한이 필요합니다.
-
-            권한이 없으면 캡처는 저장되고 클립보드에는 복사되지만, 대상 앱 활성화와 붙여넣기는 진행하지 않습니다.
-            """
-        }
-    }
-}
-
-private enum PermissionAlertAction {
-    case openSettings
-    case retry
-    case cancel
 }
