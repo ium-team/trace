@@ -10,7 +10,7 @@ enum CaptureMode: String, Codable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .copyOnly:
-            "복사만 하기"
+            "기본 캡처"
         case .deliverToApp:
             "앱으로 자동 전달"
         }
@@ -55,13 +55,13 @@ struct CapturePlan: Identifiable, Hashable {
     var description: String {
         switch (scope, mode) {
         case (.area, .copyOnly):
-            "드래그한 영역을 저장하고 클립보드에 복사합니다."
+            "드래그한 영역을 설정에 따라 저장하거나 자동 복사합니다."
         case (.fullScreen, .copyOnly):
-            "현재 디스플레이 전체를 저장하고 클립보드에 복사합니다."
+            "현재 디스플레이 전체를 설정에 따라 저장하거나 자동 복사합니다."
         case (.area, .deliverToApp):
-            "드래그한 영역을 저장한 뒤 전달할 앱을 선택합니다."
+            "드래그한 영역을 캡처한 뒤 전달할 앱을 선택합니다."
         case (.fullScreen, .deliverToApp):
-            "현재 디스플레이 전체를 저장한 뒤 전달할 앱을 선택합니다."
+            "현재 디스플레이 전체를 캡처한 뒤 전달할 앱을 선택합니다."
         }
     }
 
@@ -139,9 +139,9 @@ struct TraceSettings: Codable, Equatable {
         var title: String {
             switch self {
             case .copyAndSave:
-                "복사 및 저장"
+                "저장"
             case .copyOnly:
-                "복사"
+                "저장 안 함"
             }
         }
     }
@@ -155,9 +155,9 @@ struct TraceSettings: Codable, Equatable {
         var title: String {
             switch self {
             case .copyAndDeliver:
-                "복사 및 전달"
+                "전달"
             case .copySaveAndDeliver:
-                "복사 및 저장 및 전달"
+                "저장 및 전달"
             }
         }
     }
@@ -217,15 +217,16 @@ struct TraceSettings: Codable, Equatable {
         var title: String {
             switch self {
             case .koreanAlphabet:
-                "가나다"
+                "가, 나, 다"
             case .numeric:
-                "1234"
+                "001, 002, 003"
             }
         }
     }
 
     var saveDirectory: String
     var globalShortcut: String
+    var copyToClipboardByDefault: Bool
     var basicCaptureShortcut: String
     var deliveryCaptureShortcut: String
     var defaultCaptureMode: CaptureMode
@@ -245,6 +246,7 @@ struct TraceSettings: Codable, Equatable {
     static let defaults = TraceSettings(
         saveDirectory: defaultSaveDirectory,
         globalShortcut: "command+shift+2",
+        copyToClipboardByDefault: true,
         basicCaptureShortcut: "command+shift+2",
         deliveryCaptureShortcut: "command+shift+3",
         defaultCaptureMode: .copyOnly,
@@ -258,6 +260,7 @@ struct TraceSettings: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case saveDirectory
         case globalShortcut
+        case copyToClipboardByDefault
         case basicCaptureShortcut
         case deliveryCaptureShortcut
         case defaultCaptureMode
@@ -271,6 +274,7 @@ struct TraceSettings: Codable, Equatable {
     init(
         saveDirectory: String,
         globalShortcut: String,
+        copyToClipboardByDefault: Bool = true,
         basicCaptureShortcut: String? = nil,
         deliveryCaptureShortcut: String = "command+shift+3",
         defaultCaptureMode: CaptureMode,
@@ -282,6 +286,7 @@ struct TraceSettings: Codable, Equatable {
     ) {
         self.saveDirectory = saveDirectory
         self.globalShortcut = globalShortcut
+        self.copyToClipboardByDefault = copyToClipboardByDefault
         self.basicCaptureShortcut = basicCaptureShortcut ?? globalShortcut
         self.deliveryCaptureShortcut = deliveryCaptureShortcut
         self.defaultCaptureMode = defaultCaptureMode
@@ -296,6 +301,7 @@ struct TraceSettings: Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         saveDirectory = try container.decode(String.self, forKey: .saveDirectory)
         globalShortcut = try container.decode(String.self, forKey: .globalShortcut)
+        copyToClipboardByDefault = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboardByDefault) ?? true
         basicCaptureShortcut = try container.decodeIfPresent(String.self, forKey: .basicCaptureShortcut) ?? globalShortcut
         deliveryCaptureShortcut = try container.decodeIfPresent(String.self, forKey: .deliveryCaptureShortcut) ?? "command+shift+3"
         defaultCaptureMode = try container.decode(CaptureMode.self, forKey: .defaultCaptureMode)

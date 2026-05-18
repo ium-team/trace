@@ -165,7 +165,7 @@ final class CaptureStorage {
         case .numeric:
             var index = 1
             while true {
-                let candidate = "\(index)"
+                let candidate = String(format: "%03d", index)
                 if !existingNames.contains(candidate) {
                     return candidate
                 }

@@ -49,6 +49,11 @@ struct SettingsView: View {
             }
 
             Section("캡처") {
+                Toggle("캡처 후 자동 복사", isOn: $draft.copyToClipboardByDefault)
+                Text("끄면 기본 캡처는 클립보드에 자동 복사하지 않습니다. 앱 전달은 붙여넣기 기반이라 전달 순간에는 클립보드를 사용합니다.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
                 Picker("기본 캡처 방식", selection: $draft.defaultCaptureMode) {
                     ForEach(CaptureMode.allCases) { mode in
                         Text(mode.title).tag(mode)
@@ -78,7 +83,7 @@ struct SettingsView: View {
                     }
                 }
                 TextField("전역 단축키", text: $draft.deliveryCaptureShortcut)
-                Text("전달은 붙여넣기 기반이라 항상 먼저 클립보드에 복사합니다. 저장하지 않는 전달 캡처는 히스토리에 남지 않습니다.")
+                Text("저장하지 않는 전달 캡처는 히스토리에 남지 않습니다.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

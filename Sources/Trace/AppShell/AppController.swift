@@ -147,7 +147,10 @@ final class AppController {
         switch result {
         case .success(let capture):
             do {
-                try ClipboardService.copy(image: capture.image)
+                let shouldCopyToClipboard = settingsStore.settings.copyToClipboardByDefault || mode == .deliverToApp
+                if shouldCopyToClipboard {
+                    try ClipboardService.copy(image: capture.image)
+                }
 
                 let saved = try saveIfNeeded(capture: capture, mode: mode)
 
@@ -158,7 +161,7 @@ final class AppController {
                     presentDestinationPicker(for: saved)
                 } else if saved != nil {
                     openHistory()
-                } else {
+                } else if shouldCopyToClipboard {
                     TraceNotificationCenter.showCopied(enabled: true)
                 }
             } catch {

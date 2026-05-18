@@ -45,6 +45,24 @@ final class CaptureStorageTests: XCTestCase {
         XCTAssertEqual(storage.captures.count, 2)
     }
 
+    func testNumericSequenceFilenamesArePadded() throws {
+        let settings = TraceSettings(
+            saveDirectory: temporaryRoot.path,
+            globalShortcut: "command+shift+2",
+            defaultCaptureMode: .copyOnly,
+            fileNameRule: .sequence,
+            sequenceStyle: .numeric
+        )
+        let storage = CaptureStorage(settingsStore: SettingsStore(settings: settings))
+        let date = ISO8601DateFormatter().date(from: "2026-05-17T14:32:08+09:00")!
+
+        let first = try storage.save(image: testImage(), mode: .copyOnly, date: date)
+        let second = try storage.save(image: testImage(), mode: .copyOnly, date: date)
+
+        XCTAssertEqual(first.fileURL.lastPathComponent, "001.png")
+        XCTAssertEqual(second.fileURL.lastPathComponent, "002.png")
+    }
+
     func testCorruptMetadataIsRecoveredAsEmpty() throws {
         let metadataURL = temporaryRoot.appendingPathComponent("metadata.json")
         try "not-json".data(using: .utf8)!.write(to: metadataURL)
