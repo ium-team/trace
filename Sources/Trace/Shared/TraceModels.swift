@@ -130,9 +130,74 @@ struct CaptureMetadata: Codable {
 }
 
 struct TraceSettings: Codable, Equatable {
+    enum FileNameRule: String, Codable, CaseIterable, Identifiable {
+        case dateTime
+        case sequence
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .dateTime:
+                "날짜/시간"
+            case .sequence:
+                "순서"
+            }
+        }
+    }
+
+    enum DateFileNameFormat: String, Codable, CaseIterable, Identifiable {
+        case yearMonthDayHourMinuteSecond
+        case yearMonthDayHourMinute
+        case yearMonthDay
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .yearMonthDayHourMinuteSecond:
+                "YYYY-MM-DD_HH-mm-ss"
+            case .yearMonthDayHourMinute:
+                "YYYY-MM-DD_HH-mm"
+            case .yearMonthDay:
+                "YYYY-MM-DD"
+            }
+        }
+
+        var pattern: String {
+            switch self {
+            case .yearMonthDayHourMinuteSecond:
+                "yyyy-MM-dd_HH-mm-ss"
+            case .yearMonthDayHourMinute:
+                "yyyy-MM-dd_HH-mm"
+            case .yearMonthDay:
+                "yyyy-MM-dd"
+            }
+        }
+    }
+
+    enum SequenceStyle: String, Codable, CaseIterable, Identifiable {
+        case koreanAlphabet
+        case numeric
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .koreanAlphabet:
+                "가나다"
+            case .numeric:
+                "1234"
+            }
+        }
+    }
+
     var saveDirectory: String
     var globalShortcut: String
     var defaultCaptureMode: CaptureMode
+    var fileNameRule: FileNameRule
+    var dateFileNameFormat: DateFileNameFormat
+    var sequenceStyle: SequenceStyle
 
     static var defaultSaveDirectory: String {
         FileManager.default.homeDirectoryForCurrentUser
@@ -144,8 +209,46 @@ struct TraceSettings: Codable, Equatable {
     static let defaults = TraceSettings(
         saveDirectory: defaultSaveDirectory,
         globalShortcut: "command+shift+2",
-        defaultCaptureMode: .copyOnly
+        defaultCaptureMode: .copyOnly,
+        fileNameRule: .dateTime,
+        dateFileNameFormat: .yearMonthDayHourMinuteSecond,
+        sequenceStyle: .numeric
     )
+
+    private enum CodingKeys: String, CodingKey {
+        case saveDirectory
+        case globalShortcut
+        case defaultCaptureMode
+        case fileNameRule
+        case dateFileNameFormat
+        case sequenceStyle
+    }
+
+    init(
+        saveDirectory: String,
+        globalShortcut: String,
+        defaultCaptureMode: CaptureMode,
+        fileNameRule: FileNameRule,
+        dateFileNameFormat: DateFileNameFormat,
+        sequenceStyle: SequenceStyle
+    ) {
+        self.saveDirectory = saveDirectory
+        self.globalShortcut = globalShortcut
+        self.defaultCaptureMode = defaultCaptureMode
+        self.fileNameRule = fileNameRule
+        self.dateFileNameFormat = dateFileNameFormat
+        self.sequenceStyle = sequenceStyle
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        saveDirectory = try container.decode(String.self, forKey: .saveDirectory)
+        globalShortcut = try container.decode(String.self, forKey: .globalShortcut)
+        defaultCaptureMode = try container.decode(CaptureMode.self, forKey: .defaultCaptureMode)
+        fileNameRule = try container.decodeIfPresent(FileNameRule.self, forKey: .fileNameRule) ?? .dateTime
+        dateFileNameFormat = try container.decodeIfPresent(DateFileNameFormat.self, forKey: .dateFileNameFormat) ?? .yearMonthDayHourMinuteSecond
+        sequenceStyle = try container.decodeIfPresent(SequenceStyle.self, forKey: .sequenceStyle) ?? .numeric
+    }
 }
 
 struct CaptureResult {

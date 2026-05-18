@@ -28,15 +28,23 @@ struct SettingsView: View {
                         Label("선택", systemImage: "folder")
                     }
                 }
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("알림")
-                        Text(notificationStatusDescription)
-                            .font(.caption)
-                            .foregroundStyle(notificationStatus == .denied ? .orange : .secondary)
+                Picker("저장 이름", selection: $draft.fileNameRule) {
+                    ForEach(TraceSettings.FileNameRule.allCases) { rule in
+                        Text(rule.title).tag(rule)
                     }
-                    Spacer()
-                    Button("알림 설정 열기", action: openNotificationSettings)
+                }
+                if draft.fileNameRule == .dateTime {
+                    Picker("날짜 형식", selection: $draft.dateFileNameFormat) {
+                        ForEach(TraceSettings.DateFileNameFormat.allCases) { format in
+                            Text(format.title).tag(format)
+                        }
+                    }
+                } else {
+                    Picker("순서 형식", selection: $draft.sequenceStyle) {
+                        ForEach(TraceSettings.SequenceStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
                 }
             }
 
@@ -121,21 +129,6 @@ struct SettingsView: View {
 
     private var canPostNotifications: Bool {
         notificationStatus == .authorized || notificationStatus == .provisional
-    }
-
-    private var notificationStatusDescription: String {
-        switch notificationStatus {
-        case .authorized, .provisional:
-            "macOS 시스템 설정에서 켜져 있습니다."
-        case .denied:
-            "macOS 시스템 설정에서 꺼져 있습니다."
-        case .notDetermined:
-            "아직 macOS 알림 권한이 정해지지 않았습니다."
-        case .ephemeral:
-            "현재 세션에서만 허용되어 있습니다."
-        @unknown default:
-            "알림 상태를 확인할 수 없습니다."
-        }
     }
 
     private func openNotificationSettings() {

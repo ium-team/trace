@@ -60,7 +60,7 @@ final class CaptureStorage {
         try fileManager.createDirectory(at: capturesDirectory, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: thumbnailsDirectory, withIntermediateDirectories: true)
 
-        let baseName = TraceDateFormatters.filename.string(from: date)
+        let baseName = makeBaseName(date: date, capturesDirectory: capturesDirectory)
         let imageURL = uniqueURL(directory: capturesDirectory, baseName: baseName, extension: "png")
         let id = imageURL.deletingPathExtension().lastPathComponent
 
@@ -136,6 +136,54 @@ final class CaptureStorage {
             suffix += 1
         }
         return candidate
+    }
+
+    private func makeBaseName(date: Date, capturesDirectory: URL) -> String {
+        switch settingsStore.settings.fileNameRule {
+        case .dateTime:
+            return formatter(for: settingsStore.settings.dateFileNameFormat).string(from: date)
+        case .sequence:
+            return nextSequenceBaseName(in: capturesDirectory, style: settingsStore.settings.sequenceStyle)
+        }
+    }
+
+    private func formatter(for format: TraceSettings.DateFileNameFormat) -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = format.pattern
+        return formatter
+    }
+
+    private func nextSequenceBaseName(in directory: URL, style: TraceSettings.SequenceStyle) -> String {
+        let existingNames: Set<String> = Set(
+            (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil))?
+                .filter { $0.pathExtension.lowercased() == "png" }
+                .map { $0.deletingPathExtension().lastPathComponent } ?? []
+        )
+
+        switch style {
+        case .numeric:
+            var index = 1
+            while true {
+                let candidate = "\(index)"
+                if !existingNames.contains(candidate) {
+                    return candidate
+                }
+                index += 1
+            }
+        case .koreanAlphabet:
+            let letters = ["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하"]
+            var cycle = 1
+            while true {
+                for letter in letters {
+                    let candidate = cycle == 1 ? letter : "\(letter)\(cycle)"
+                    if !existingNames.contains(candidate) {
+                        return candidate
+                    }
+                }
+                cycle += 1
+            }
+        }
     }
 
     private func writeMetadata() throws {
