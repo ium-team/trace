@@ -165,9 +165,13 @@ final class DeliveryService {
                 return nil
             }
 
-            let title = (rawWindow[kCGWindowName as String] as? String)
-                .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
-                ?? "제목 없는 윈도우"
+            let rawTitle = (rawWindow[kCGWindowName as String] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let hasTitle = rawTitle?.isEmpty == false
+            guard hasTitle || shouldKeepUntitledWindow(rawWindow, bounds: bounds) else {
+                return nil
+            }
+            let title = hasTitle ? rawTitle! : "제목 없는 윈도우"
 
             return VisibleWindow(
                 title: title,
@@ -214,6 +218,13 @@ final class DeliveryService {
 
     private func isOnScreen(_ rawWindow: [String: Any]) -> Bool {
         rawWindow[kCGWindowIsOnscreen as String] as? Bool == true
+    }
+
+    private func shouldKeepUntitledWindow(_ rawWindow: [String: Any], bounds: CGRect) -> Bool {
+        let alpha = rawWindow[kCGWindowAlpha as String] as? CGFloat ?? 1
+        let hasUsefulSize = bounds.width >= 160 && bounds.height >= 120
+        let isVisibleEnough = alpha >= 0.1
+        return hasUsefulSize && isVisibleEnough
     }
 
     private func accessibilityWindow(at point: CGPoint) -> AXUIElement? {
