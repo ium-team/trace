@@ -84,14 +84,8 @@ struct HistoryView: View {
                 CapturePreview(
                     item: primarySelectedItem,
                     selectedCount: selectedCount,
-                    selectedItems: selectedItems,
                     storage: storage,
                     onRename: openRename,
-                    onTogglePinned: togglePinnedForSelection,
-                    onToggleBookmarked: toggleBookmarkedForSelection,
-                    onCopy: copyPrimarySelection,
-                    onReveal: revealPrimarySelection,
-                    onDelete: { isShowingDeleteConfirmation = true }
                 )
             } else {
                 ContentUnavailableView("캡처 선택", systemImage: "photo.on.rectangle")
@@ -106,12 +100,41 @@ struct HistoryView: View {
                 }
             }
 
-            ToolbarItem {
+            ToolbarItemGroup(placement: .primaryAction) {
                 Button {
-                    storage.reload()
+                    togglePinnedForSelection()
                 } label: {
-                    Label("새로고침", systemImage: "arrow.clockwise")
+                    Label(selectedItems.allSatisfy(\.isPinned) ? "고정 해제" : "고정", systemImage: selectedItems.allSatisfy(\.isPinned) ? "pin.slash" : "pin")
                 }
+                .disabled(selectedCount == 0)
+
+                Button {
+                    toggleBookmarkedForSelection()
+                } label: {
+                    Label(selectedItems.allSatisfy(\.isBookmarked) ? "북마크 해제" : "북마크", systemImage: selectedItems.allSatisfy(\.isBookmarked) ? "bookmark.slash" : "bookmark")
+                }
+                .disabled(selectedCount == 0)
+
+                Button {
+                    copyPrimarySelection()
+                } label: {
+                    Label("복사", systemImage: "doc.on.clipboard")
+                }
+                .disabled(selectedCount == 0)
+
+                Button {
+                    revealPrimarySelection()
+                } label: {
+                    Label("Finder", systemImage: "finder")
+                }
+                .disabled(selectedCount == 0)
+
+                Button(role: .destructive) {
+                    isShowingDeleteConfirmation = true
+                } label: {
+                    Label("삭제", systemImage: "trash")
+                }
+                .disabled(selectedCount == 0)
             }
         }
         .alert("Trace", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
@@ -403,14 +426,8 @@ struct HistoryRow: View {
 struct CapturePreview: View {
     let item: CaptureItem
     let selectedCount: Int
-    let selectedItems: [CaptureItem]
     let storage: CaptureStorage
     let onRename: () -> Void
-    let onTogglePinned: () -> Void
-    let onToggleBookmarked: () -> Void
-    let onCopy: () -> Void
-    let onReveal: () -> Void
-    let onDelete: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -428,17 +445,7 @@ struct CapturePreview: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                CaptureActionBar(
-                    selectedCount: selectedCount,
-                    allSelectedPinned: selectedItems.allSatisfy(\.isPinned),
-                    allSelectedBookmarked: selectedItems.allSatisfy(\.isBookmarked),
-                    onRename: onRename,
-                    onTogglePinned: onTogglePinned,
-                    onToggleBookmarked: onToggleBookmarked,
-                    onCopy: onCopy,
-                    onReveal: onReveal,
-                    onDelete: onDelete
-                )
+                renameButton
             }
             .padding()
             .background(.background)
@@ -460,49 +467,6 @@ struct CapturePreview: View {
         }
         .frame(minWidth: 580, minHeight: 420)
     }
-}
-
-private struct CaptureActionBar: View {
-    let selectedCount: Int
-    let allSelectedPinned: Bool
-    let allSelectedBookmarked: Bool
-    let onRename: () -> Void
-    let onTogglePinned: () -> Void
-    let onToggleBookmarked: () -> Void
-    let onCopy: () -> Void
-    let onReveal: () -> Void
-    let onDelete: () -> Void
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            buttonRow
-            VStack(alignment: .trailing, spacing: 8) {
-                HStack(spacing: 8) {
-                    renameButton
-                    pinButton
-                    bookmarkButton
-                }
-                HStack(spacing: 8) {
-                    copyButton
-                    revealButton
-                    deleteButton
-                }
-            }
-        }
-        .labelStyle(.titleAndIcon)
-        .controlSize(.small)
-    }
-
-    private var buttonRow: some View {
-        HStack(spacing: 8) {
-            renameButton
-            pinButton
-            bookmarkButton
-            copyButton
-            revealButton
-            deleteButton
-        }
-    }
 
     private var renameButton: some View {
         Button {
@@ -510,52 +474,8 @@ private struct CaptureActionBar: View {
         } label: {
             Label("이름 변경", systemImage: "pencil")
         }
+        .controlSize(.small)
         .disabled(selectedCount != 1)
-    }
-
-    private var pinButton: some View {
-        Button {
-            onTogglePinned()
-        } label: {
-            Label(allSelectedPinned ? "고정 해제" : "고정", systemImage: allSelectedPinned ? "pin.slash" : "pin")
-        }
-        .disabled(selectedCount == 0)
-    }
-
-    private var bookmarkButton: some View {
-        Button {
-            onToggleBookmarked()
-        } label: {
-            Label(allSelectedBookmarked ? "북마크 해제" : "북마크", systemImage: allSelectedBookmarked ? "bookmark.slash" : "bookmark")
-        }
-        .disabled(selectedCount == 0)
-    }
-
-    private var copyButton: some View {
-        Button {
-            onCopy()
-        } label: {
-            Label("복사", systemImage: "doc.on.clipboard")
-        }
-        .disabled(selectedCount == 0)
-    }
-
-    private var revealButton: some View {
-        Button {
-            onReveal()
-        } label: {
-            Label("Finder", systemImage: "finder")
-        }
-        .disabled(selectedCount == 0)
-    }
-
-    private var deleteButton: some View {
-        Button(role: .destructive) {
-            onDelete()
-        } label: {
-            Label("삭제", systemImage: "trash")
-        }
-        .disabled(selectedCount == 0)
     }
 }
 
