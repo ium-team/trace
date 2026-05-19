@@ -64,7 +64,7 @@ final class CaptureStorage {
         try fileManager.createDirectory(at: capturesDirectory, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: thumbnailsDirectory, withIntermediateDirectories: true)
 
-        let baseName = makeBaseName(date: date, capturesDirectory: capturesDirectory)
+        let baseName = makeBaseName(date: date)
         let imageURL = uniqueURL(directory: capturesDirectory, baseName: baseName, extension: "png")
         let id = imageURL.deletingPathExtension().lastPathComponent
 
@@ -182,6 +182,14 @@ final class CaptureStorage {
         metadata = nextMetadata
     }
 
+    func delete(itemIDs: [String]) throws {
+        let uniqueIDs = Set(itemIDs)
+        guard !uniqueIDs.isEmpty else { return }
+        for itemID in uniqueIDs {
+            try delete(itemID: itemID)
+        }
+    }
+
     func setPinned(_ isPinned: Bool, itemID: String) {
         var nextMetadata = metadata
         guard let index = nextMetadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
@@ -190,10 +198,38 @@ final class CaptureStorage {
         metadata = nextMetadata
     }
 
+    func setPinned(_ isPinned: Bool, itemIDs: [String]) {
+        let ids = Set(itemIDs)
+        guard !ids.isEmpty else { return }
+        var nextMetadata = metadata
+        var changed = false
+        for index in nextMetadata.captures.indices where ids.contains(nextMetadata.captures[index].id) {
+            nextMetadata.captures[index].isPinned = isPinned
+            changed = true
+        }
+        guard changed else { return }
+        guard (try? writeMetadata(nextMetadata)) != nil else { return }
+        metadata = nextMetadata
+    }
+
     func setBookmarked(_ isBookmarked: Bool, itemID: String) {
         var nextMetadata = metadata
         guard let index = nextMetadata.captures.firstIndex(where: { $0.id == itemID }) else { return }
         nextMetadata.captures[index].isBookmarked = isBookmarked
+        guard (try? writeMetadata(nextMetadata)) != nil else { return }
+        metadata = nextMetadata
+    }
+
+    func setBookmarked(_ isBookmarked: Bool, itemIDs: [String]) {
+        let ids = Set(itemIDs)
+        guard !ids.isEmpty else { return }
+        var nextMetadata = metadata
+        var changed = false
+        for index in nextMetadata.captures.indices where ids.contains(nextMetadata.captures[index].id) {
+            nextMetadata.captures[index].isBookmarked = isBookmarked
+            changed = true
+        }
+        guard changed else { return }
         guard (try? writeMetadata(nextMetadata)) != nil else { return }
         metadata = nextMetadata
     }
@@ -251,12 +287,12 @@ final class CaptureStorage {
             .trimmingCharacters(in: CharacterSet(charactersIn: "."))
     }
 
-    private func makeBaseName(date: Date, capturesDirectory: URL) -> String {
+    private func makeBaseName(date: Date) -> String {
         switch settingsStore.settings.fileNameRule {
         case .dateTime:
             return formatter(for: settingsStore.settings.dateFileNameFormat).string(from: date)
         case .sequence:
-            return nextSequenceBaseName(in: capturesDirectory, style: settingsStore.settings.sequenceStyle)
+            return nextSequenceBaseNameGlobal(style: settingsStore.settings.sequenceStyle)
         }
     }
 
@@ -267,36 +303,46 @@ final class CaptureStorage {
         return formatter
     }
 
-    private func nextSequenceBaseName(in directory: URL, style: TraceSettings.SequenceStyle) -> String {
-        let existingNames: Set<String> = Set(
-            (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil))?
-                .filter { $0.pathExtension.lowercased() == "png" }
-                .map { $0.deletingPathExtension().lastPathComponent } ?? []
-        )
+    private func nextSequenceBaseNameGlobal(style: TraceSettings.SequenceStyle) -> String {
+        let existingNames = metadata.captures
+            .map { URL(fileURLWithPath: $0.filePath).deletingPathExtension().lastPathComponent }
 
         switch style {
         case .numeric:
-            var index = 1
-            while true {
-                let candidate = String(format: "%03d", index)
-                if !existingNames.contains(candidate) {
-                    return candidate
-                }
-                index += 1
-            }
+            let maxIndex = existingNames
+                .compactMap { parseNumericSequence($0) }
+                .max() ?? 0
+            return String(format: "%03d", maxIndex + 1)
         case .koreanAlphabet:
             let letters = ["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하"]
-            var cycle = 1
-            while true {
-                for letter in letters {
-                    let candidate = cycle == 1 ? letter : "\(letter)\(cycle)"
-                    if !existingNames.contains(candidate) {
-                        return candidate
-                    }
-                }
-                cycle += 1
-            }
+            let maxOffset = existingNames
+                .compactMap { parseKoreanSequence($0, letters: letters) }
+                .max() ?? -1
+            let nextOffset = maxOffset + 1
+            let letterIndex = nextOffset % letters.count
+            let cycle = (nextOffset / letters.count) + 1
+            let letter = letters[letterIndex]
+            return cycle == 1 ? letter : "\(letter)\(cycle)"
         }
+    }
+
+    private func parseNumericSequence(_ value: String) -> Int? {
+        guard value.allSatisfy({ $0.isNumber }) else {
+            return nil
+        }
+        return Int(value)
+    }
+
+    private func parseKoreanSequence(_ value: String, letters: [String]) -> Int? {
+        guard let letter = letters.first(where: { value.hasPrefix($0) }) else {
+            return nil
+        }
+        let suffix = String(value.dropFirst(letter.count))
+        let cycle = suffix.isEmpty ? 1 : Int(suffix)
+        guard let cycle, cycle >= 1, let letterIndex = letters.firstIndex(of: letter) else {
+            return nil
+        }
+        return (cycle - 1) * letters.count + letterIndex
     }
 
     private func writeMetadata() throws {

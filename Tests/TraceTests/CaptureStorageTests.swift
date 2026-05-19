@@ -54,13 +54,30 @@ final class CaptureStorageTests: XCTestCase {
             sequenceStyle: .numeric
         )
         let storage = CaptureStorage(settingsStore: SettingsStore(settings: settings))
-        let date = ISO8601DateFormatter().date(from: "2026-05-17T14:32:08+09:00")!
+        let firstDate = ISO8601DateFormatter().date(from: "2026-05-17T14:32:08+09:00")!
+        let secondDate = ISO8601DateFormatter().date(from: "2026-05-18T09:02:01+09:00")!
 
-        let first = try storage.save(image: testImage(), mode: .copyOnly, date: date)
-        let second = try storage.save(image: testImage(), mode: .copyOnly, date: date)
+        let first = try storage.save(image: testImage(), mode: .copyOnly, date: firstDate)
+        let second = try storage.save(image: testImage(), mode: .copyOnly, date: secondDate)
 
         XCTAssertEqual(first.fileURL.lastPathComponent, "001.png")
         XCTAssertEqual(second.fileURL.lastPathComponent, "002.png")
+    }
+
+    func testBatchPinBookmarkDelete() throws {
+        let storage = makeStorage()
+        let first = try storage.save(image: testImage(), mode: .copyOnly)
+        let second = try storage.save(image: testImage(), mode: .copyOnly)
+
+        storage.setPinned(true, itemIDs: [first.item.id, second.item.id])
+        storage.setBookmarked(true, itemIDs: [first.item.id, second.item.id])
+
+        XCTAssertEqual(storage.pinnedCaptures.count, 2)
+        XCTAssertTrue(storage.capture(withID: first.item.id)?.isBookmarked == true)
+        XCTAssertTrue(storage.capture(withID: second.item.id)?.isBookmarked == true)
+
+        try storage.delete(itemIDs: [first.item.id, second.item.id])
+        XCTAssertTrue(storage.captures.isEmpty)
     }
 
     func testCorruptMetadataIsRecoveredAsEmpty() throws {

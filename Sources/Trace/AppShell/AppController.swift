@@ -321,7 +321,7 @@ final class AppController {
 
     private func openHistory() {
         storage.reload()
-        let view = HistoryView(storage: storage)
+        let view = HistoryView(storage: storage, settingsStore: settingsStore)
         if historyWindow == nil {
             historyWindow = makeWindow(title: "Trace 히스토리", size: NSSize(width: 1080, height: 720), rootView: view)
         } else {
