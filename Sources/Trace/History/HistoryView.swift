@@ -8,12 +8,12 @@ private enum HistorySectionKey: Hashable {
 
 struct HistoryView: View {
     @Bindable var storage: CaptureStorage
-    @Bindable var settingsStore: SettingsStore
 
     @State private var selectedItemIDs = Set<CaptureItem.ID>()
     @State private var message: String?
     @State private var pendingName = ""
     @State private var isShowingDeleteConfirmation = false
+    @State private var isShowingRenameSheet = false
     @State private var expandedSections = Set<HistorySectionKey>([.recent])
 
     private var selectedItems: [CaptureItem] {
@@ -84,30 +84,34 @@ struct HistoryView: View {
                 CapturePreview(
                     item: primarySelectedItem,
                     selectedCount: selectedCount,
+                    selectedItems: selectedItems,
                     storage: storage,
-                    settingsStore: settingsStore,
-                    pendingName: $pendingName,
-                    message: $message,
-                    isShowingDeleteConfirmation: $isShowingDeleteConfirmation,
-                    onBatchPin: { setPinned in setPinnedForSelection(setPinned) },
-                    onBatchBookmark: { setBookmarked in setBookmarkedForSelection(setBookmarked) },
-                    onBatchDelete: { deleteSelection() },
-                    onDeleted: selectLatestCaptureAfterDelete
+                    onRename: openRename,
+                    onTogglePinned: togglePinnedForSelection,
+                    onToggleBookmarked: toggleBookmarkedForSelection,
+                    onCopy: copyPrimarySelection,
+                    onReveal: revealPrimarySelection,
+                    onDelete: { isShowingDeleteConfirmation = true }
                 )
             } else {
                 ContentUnavailableView("캡처 선택", systemImage: "photo.on.rectangle")
             }
         }
         .toolbar {
-            Button {
-                storage.reload()
-            } label: {
-                Label("새로고침", systemImage: "arrow.clockwise")
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    toggleSidebar()
+                } label: {
+                    Label("사이드바", systemImage: "sidebar.left")
+                }
             }
-            Button {
-                toggleSectionExpansion()
-            } label: {
-                Label("접기/펼치기", systemImage: "sidebar.left")
+
+            ToolbarItem {
+                Button {
+                    storage.reload()
+                } label: {
+                    Label("새로고침", systemImage: "arrow.clockwise")
+                }
             }
         }
         .alert("Trace", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
@@ -129,6 +133,38 @@ struct HistoryView: View {
         }
         .onChange(of: selectedItemIDs) { _, _ in
             syncPendingName()
+        }
+        .sheet(isPresented: $isShowingRenameSheet) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("캡처 이름 변경")
+                    .font(.headline)
+                TextField("이름", text: $pendingName)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        renamePrimarySelection()
+                    }
+                HStack {
+                    Spacer()
+                    Button("취소", role: .cancel) {
+                        isShowingRenameSheet = false
+                    }
+                    Button("저장") {
+                        renamePrimarySelection()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(pendingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding()
+            .frame(width: 340)
+        }
+        .confirmationDialog(selectedCount > 1 ? "선택한 캡처를 삭제할까요?" : "이 캡처를 삭제할까요?", isPresented: $isShowingDeleteConfirmation) {
+            Button("삭제", role: .destructive) {
+                deleteSelection()
+            }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("원본 이미지, 썸네일, 히스토리 항목이 함께 삭제됩니다.")
         }
         .frame(minWidth: 980, minHeight: 640)
     }
@@ -205,14 +241,6 @@ struct HistoryView: View {
         }
     }
 
-    private func toggleSectionExpansion() {
-        if expandedSections.count > 2 {
-            expandedSections = [.recent]
-        } else {
-            expandedSections = Set(storage.groupedByDay().map { HistorySectionKey.day($0.0) } + [.recent])
-        }
-    }
-
     private func selectLatestCaptureIfNeeded(force: Bool) {
         if !force && !selectedItemIDs.isEmpty {
             return
@@ -242,6 +270,58 @@ struct HistoryView: View {
 
     private func setBookmarkedForSelection(_ bookmarked: Bool) {
         storage.setBookmarked(bookmarked, itemIDs: Array(selectedItemIDs))
+    }
+
+    private func togglePinnedForSelection() {
+        let shouldPin = !selectedItems.allSatisfy(\.isPinned)
+        setPinnedForSelection(shouldPin)
+    }
+
+    private func toggleBookmarkedForSelection() {
+        let shouldBookmark = !selectedItems.allSatisfy(\.isBookmarked)
+        setBookmarkedForSelection(shouldBookmark)
+    }
+
+    private func copyPrimarySelection() {
+        guard let item = primarySelectedItem else { return }
+        do {
+            try ClipboardService.copyImageFile(at: storage.absoluteURL(for: item.filePath))
+            message = "클립보드에 복사했습니다."
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    private func revealPrimarySelection() {
+        guard let item = primarySelectedItem else { return }
+        let url = storage.absoluteURL(for: item.filePath)
+        if FileManager.default.fileExists(atPath: url.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else {
+            message = "Finder에서 열 파일을 찾을 수 없습니다."
+        }
+    }
+
+    private func openRename() {
+        guard selectedCount == 1 else { return }
+        pendingName = primarySelectedItem?.displayTitle ?? ""
+        isShowingRenameSheet = true
+    }
+
+    private func renamePrimarySelection() {
+        guard let item = primarySelectedItem else { return }
+        do {
+            try storage.rename(itemID: item.id, to: pendingName)
+            pendingName = storage.capture(withID: item.id)?.displayTitle ?? pendingName
+            message = "캡처 이름을 변경했습니다."
+            isShowingRenameSheet = false
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    private func toggleSidebar() {
+        NSApp.sendAction(#selector(NSSplitViewController.toggleSidebar(_:)), to: nil, from: nil)
     }
 
     private func deleteSelection() {
@@ -323,91 +403,42 @@ struct HistoryRow: View {
 struct CapturePreview: View {
     let item: CaptureItem
     let selectedCount: Int
+    let selectedItems: [CaptureItem]
     let storage: CaptureStorage
-    let settingsStore: SettingsStore
-    @Binding var pendingName: String
-    @Binding var message: String?
-    @Binding var isShowingDeleteConfirmation: Bool
-    let onBatchPin: (_ setPinned: Bool) -> Void
-    let onBatchBookmark: (_ setBookmarked: Bool) -> Void
-    let onBatchDelete: () -> Void
-    let onDeleted: () -> Void
+    let onRename: () -> Void
+    let onTogglePinned: () -> Void
+    let onToggleBookmarked: () -> Void
+    let onCopy: () -> Void
+    let onReveal: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 12) {
-                HStack(alignment: .center, spacing: 10) {
-                    TextField("캡처 이름", text: $pendingName)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(minWidth: 240, maxWidth: 420)
-                        .onSubmit(saveName)
-                    Button("저장") { saveName() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(selectedCount != 1 || pendingName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                    Divider().frame(height: 20)
-
-                    Button {
-                        selectedCount > 1 ? onBatchPin(true) : storage.setPinned(!item.isPinned, itemID: item.id)
-                    } label: {
-                        Label(selectedCount > 1 ? "일괄 고정" : (item.isPinned ? "고정 해제" : "고정"), systemImage: item.isPinned ? "pin.slash" : "pin")
-                    }
-
-                    Button {
-                        selectedCount > 1 ? onBatchBookmark(true) : storage.setBookmarked(!item.isBookmarked, itemID: item.id)
-                    } label: {
-                        Label(selectedCount > 1 ? "일괄 북마크" : (item.isBookmarked ? "북마크 해제" : "북마크"), systemImage: item.isBookmarked ? "bookmark.slash" : "bookmark")
-                    }
-
-                    Button { copy() } label: {
-                        Label("복사", systemImage: "doc.on.clipboard")
-                    }
-                    Button { reveal() } label: {
-                        Label("Finder", systemImage: "finder")
-                    }
-                    Button(role: .destructive) {
-                        isShowingDeleteConfirmation = true
-                    } label: {
-                        Label(selectedCount > 1 ? "일괄 삭제" : "삭제", systemImage: "trash")
-                    }
-                }
-
-                HStack {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(item.displayTitle)
+                        .font(.headline)
                     Text(TraceDateFormatters.displayDate.string(from: item.createdAt))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Text(item.filePath)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    HStack(spacing: 8) {
-                        Picker("이름 규칙", selection: namingRuleBinding) {
-                            ForEach(TraceSettings.FileNameRule.allCases) { rule in
-                                Text(rule.title).tag(rule)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 120)
-
-                        if settingsStore.settings.fileNameRule == .dateTime {
-                            Picker("날짜 형식", selection: dateFormatBinding) {
-                                ForEach(TraceSettings.DateFileNameFormat.allCases) { format in
-                                    Text(format.title).tag(format)
-                                }
-                            }
-                            .labelsHidden()
-                            .frame(width: 180)
-                        } else {
-                            Picker("순서 형식", selection: sequenceStyleBinding) {
-                                ForEach(TraceSettings.SequenceStyle.allCases) { style in
-                                    Text(style.title).tag(style)
-                                }
-                            }
-                            .labelsHidden()
-                            .frame(width: 140)
-                        }
-                    }
+                        .lineLimit(1)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                CaptureActionBar(
+                    selectedCount: selectedCount,
+                    allSelectedPinned: selectedItems.allSatisfy(\.isPinned),
+                    allSelectedBookmarked: selectedItems.allSatisfy(\.isBookmarked),
+                    onRename: onRename,
+                    onTogglePinned: onTogglePinned,
+                    onToggleBookmarked: onToggleBookmarked,
+                    onCopy: onCopy,
+                    onReveal: onReveal,
+                    onDelete: onDelete
+                )
             }
             .padding()
             .background(.background)
@@ -427,91 +458,104 @@ struct CapturePreview: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .confirmationDialog(selectedCount > 1 ? "선택한 캡처를 삭제할까요?" : "이 캡처를 삭제할까요?", isPresented: $isShowingDeleteConfirmation) {
-            Button("삭제", role: .destructive) {
-                if selectedCount > 1 {
-                    onBatchDelete()
-                } else {
-                    delete()
-                }
-            }
-            Button("취소", role: .cancel) {}
-        } message: {
-            Text("원본 이미지, 썸네일, 히스토리 항목이 함께 삭제됩니다.")
-        }
         .frame(minWidth: 580, minHeight: 420)
     }
+}
 
-    private var namingRuleBinding: Binding<TraceSettings.FileNameRule> {
-        Binding(
-            get: { settingsStore.settings.fileNameRule },
-            set: { newValue in
-                var updated = settingsStore.settings
-                updated.fileNameRule = newValue
-                settingsStore.update(updated)
+private struct CaptureActionBar: View {
+    let selectedCount: Int
+    let allSelectedPinned: Bool
+    let allSelectedBookmarked: Bool
+    let onRename: () -> Void
+    let onTogglePinned: () -> Void
+    let onToggleBookmarked: () -> Void
+    let onCopy: () -> Void
+    let onReveal: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            buttonRow
+            VStack(alignment: .trailing, spacing: 8) {
+                HStack(spacing: 8) {
+                    renameButton
+                    pinButton
+                    bookmarkButton
+                }
+                HStack(spacing: 8) {
+                    copyButton
+                    revealButton
+                    deleteButton
+                }
             }
-        )
+        }
+        .labelStyle(.titleAndIcon)
+        .controlSize(.small)
     }
 
-    private var dateFormatBinding: Binding<TraceSettings.DateFileNameFormat> {
-        Binding(
-            get: { settingsStore.settings.dateFileNameFormat },
-            set: { newValue in
-                var updated = settingsStore.settings
-                updated.dateFileNameFormat = newValue
-                settingsStore.update(updated)
-            }
-        )
-    }
-
-    private var sequenceStyleBinding: Binding<TraceSettings.SequenceStyle> {
-        Binding(
-            get: { settingsStore.settings.sequenceStyle },
-            set: { newValue in
-                var updated = settingsStore.settings
-                updated.sequenceStyle = newValue
-                settingsStore.update(updated)
-            }
-        )
-    }
-
-    private func saveName() {
-        do {
-            try storage.rename(itemID: item.id, to: pendingName)
-            pendingName = storage.capture(withID: item.id)?.displayTitle ?? pendingName
-            message = "캡처 이름을 변경했습니다."
-        } catch {
-            pendingName = item.displayTitle
-            message = error.localizedDescription
+    private var buttonRow: some View {
+        HStack(spacing: 8) {
+            renameButton
+            pinButton
+            bookmarkButton
+            copyButton
+            revealButton
+            deleteButton
         }
     }
 
-    private func copy() {
-        do {
-            try ClipboardService.copyImageFile(at: storage.absoluteURL(for: item.filePath))
-            message = "클립보드에 복사했습니다."
-        } catch {
-            message = error.localizedDescription
+    private var renameButton: some View {
+        Button {
+            onRename()
+        } label: {
+            Label("이름 변경", systemImage: "pencil")
         }
+        .disabled(selectedCount != 1)
     }
 
-    private func reveal() {
-        let url = storage.absoluteURL(for: item.filePath)
-        if FileManager.default.fileExists(atPath: url.path) {
-            NSWorkspace.shared.activateFileViewerSelecting([url])
-        } else {
-            message = "Finder에서 열 파일을 찾을 수 없습니다."
+    private var pinButton: some View {
+        Button {
+            onTogglePinned()
+        } label: {
+            Label(allSelectedPinned ? "고정 해제" : "고정", systemImage: allSelectedPinned ? "pin.slash" : "pin")
         }
+        .disabled(selectedCount == 0)
     }
 
-    private func delete() {
-        do {
-            try storage.delete(itemID: item.id)
-            message = "캡처를 삭제했습니다."
-            onDeleted()
-        } catch {
-            message = error.localizedDescription
+    private var bookmarkButton: some View {
+        Button {
+            onToggleBookmarked()
+        } label: {
+            Label(allSelectedBookmarked ? "북마크 해제" : "북마크", systemImage: allSelectedBookmarked ? "bookmark.slash" : "bookmark")
         }
+        .disabled(selectedCount == 0)
+    }
+
+    private var copyButton: some View {
+        Button {
+            onCopy()
+        } label: {
+            Label("복사", systemImage: "doc.on.clipboard")
+        }
+        .disabled(selectedCount == 0)
+    }
+
+    private var revealButton: some View {
+        Button {
+            onReveal()
+        } label: {
+            Label("Finder", systemImage: "finder")
+        }
+        .disabled(selectedCount == 0)
+    }
+
+    private var deleteButton: some View {
+        Button(role: .destructive) {
+            onDelete()
+        } label: {
+            Label("삭제", systemImage: "trash")
+        }
+        .disabled(selectedCount == 0)
     }
 }
 
