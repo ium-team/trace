@@ -171,6 +171,7 @@ deliveryCaptureShortcut
 defaultCaptureMode
 basicCaptureAction
 deliveryCaptureAction
+deliveryTargetMode
 ```
 
 ## 핵심 흐름
@@ -195,8 +196,8 @@ GlobalShortcut
   -> CaptureResult
   -> Clipboard.copy
   -> Storage.save if deliveryCaptureAction is copySaveAndDeliver
-  -> DeliveryDestinationPicker
-  -> DeliveryWindowPicker
+  -> DeliveryDestinationPicker and DeliveryWindowPicker if deliveryTargetMode is chooseEachTime
+  -> Most recent frontmost app if deliveryTargetMode is mostRecentApp
   -> Delivery.deliver
   -> History.refresh if saved
 ```

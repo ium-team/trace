@@ -231,6 +231,22 @@ struct TraceSettings: Codable, Equatable {
         }
     }
 
+    enum DeliveryTargetMode: String, Codable, CaseIterable, Identifiable {
+        case chooseEachTime
+        case mostRecentApp
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .chooseEachTime:
+                "매번 앱 선택"
+            case .mostRecentApp:
+                "가장 최근 사용 앱"
+            }
+        }
+    }
+
     enum FileNameRule: String, Codable, CaseIterable, Identifiable {
         case dateTime
         case sequence
@@ -301,6 +317,7 @@ struct TraceSettings: Codable, Equatable {
     var defaultCaptureMode: CaptureMode
     var basicCaptureAction: BasicCaptureAction
     var deliveryCaptureAction: DeliveryCaptureAction
+    var deliveryTargetMode: DeliveryTargetMode
     var fileNameRule: FileNameRule
     var dateFileNameFormat: DateFileNameFormat
     var sequenceStyle: SequenceStyle
@@ -321,6 +338,7 @@ struct TraceSettings: Codable, Equatable {
         defaultCaptureMode: .copyOnly,
         basicCaptureAction: .copyAndSave,
         deliveryCaptureAction: .copySaveAndDeliver,
+        deliveryTargetMode: .chooseEachTime,
         fileNameRule: .dateTime,
         dateFileNameFormat: .yearMonthDayHourMinuteSecond,
         sequenceStyle: .numeric
@@ -335,6 +353,7 @@ struct TraceSettings: Codable, Equatable {
         case defaultCaptureMode
         case basicCaptureAction
         case deliveryCaptureAction
+        case deliveryTargetMode
         case fileNameRule
         case dateFileNameFormat
         case sequenceStyle
@@ -349,6 +368,7 @@ struct TraceSettings: Codable, Equatable {
         defaultCaptureMode: CaptureMode,
         basicCaptureAction: BasicCaptureAction = .copyAndSave,
         deliveryCaptureAction: DeliveryCaptureAction = .copySaveAndDeliver,
+        deliveryTargetMode: DeliveryTargetMode = .chooseEachTime,
         fileNameRule: FileNameRule = .dateTime,
         dateFileNameFormat: DateFileNameFormat = .yearMonthDayHourMinuteSecond,
         sequenceStyle: SequenceStyle = .numeric
@@ -361,6 +381,7 @@ struct TraceSettings: Codable, Equatable {
         self.defaultCaptureMode = defaultCaptureMode
         self.basicCaptureAction = basicCaptureAction
         self.deliveryCaptureAction = deliveryCaptureAction
+        self.deliveryTargetMode = deliveryTargetMode
         self.fileNameRule = fileNameRule
         self.dateFileNameFormat = dateFileNameFormat
         self.sequenceStyle = sequenceStyle
@@ -376,6 +397,7 @@ struct TraceSettings: Codable, Equatable {
         defaultCaptureMode = try container.decode(CaptureMode.self, forKey: .defaultCaptureMode)
         basicCaptureAction = try container.decodeIfPresent(BasicCaptureAction.self, forKey: .basicCaptureAction) ?? .copyAndSave
         deliveryCaptureAction = try container.decodeIfPresent(DeliveryCaptureAction.self, forKey: .deliveryCaptureAction) ?? .copySaveAndDeliver
+        deliveryTargetMode = try container.decodeIfPresent(DeliveryTargetMode.self, forKey: .deliveryTargetMode) ?? .chooseEachTime
         fileNameRule = try container.decodeIfPresent(FileNameRule.self, forKey: .fileNameRule) ?? .dateTime
         dateFileNameFormat = try container.decodeIfPresent(DateFileNameFormat.self, forKey: .dateFileNameFormat) ?? .yearMonthDayHourMinuteSecond
         sequenceStyle = try container.decodeIfPresent(SequenceStyle.self, forKey: .sequenceStyle) ?? .numeric

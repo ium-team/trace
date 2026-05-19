@@ -82,8 +82,13 @@ struct SettingsView: View {
                         Text(action.title).tag(action)
                     }
                 }
+                Picker("전달 대상", selection: $draft.deliveryTargetMode) {
+                    ForEach(TraceSettings.DeliveryTargetMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
                 TextField("전역 단축키", text: $draft.deliveryCaptureShortcut)
-                Text("저장하지 않는 전달 캡처는 히스토리에 남지 않습니다.")
+                Text("가장 최근 사용 앱은 캡처를 시작하기 직전에 활성화되어 있던 앱으로 선택 창 없이 전달합니다. 저장하지 않는 전달 캡처는 히스토리에 남지 않습니다.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

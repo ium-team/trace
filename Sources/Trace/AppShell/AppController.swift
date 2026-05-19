@@ -14,6 +14,7 @@ final class AppController {
     private var settingsWindow: NSWindow?
     private var destinationWindow: NSWindow?
     private var lastSettingsSnapshot: TraceSettings?
+    private var pendingRecentDeliveryDestination: AppDestination?
 
     func start() {
         settingsStore.save()
@@ -116,6 +117,7 @@ final class AppController {
 
     func startInteractiveCapture(defaultPlan: CapturePlan? = nil) {
         let plan = defaultPlan ?? CapturePlan(mode: settingsStore.settings.defaultCaptureMode, scope: .area)
+        pendingRecentDeliveryDestination = currentExternalFrontmostApplication()
         guard PermissionService.hasScreenRecordingPermission else {
             requestScreenRecordingPermissionForCapture(defaultPlan: plan)
             return
@@ -152,6 +154,10 @@ final class AppController {
     }
 
     private func handleCaptureResult(_ result: Result<CaptureResult, Error>, mode: CaptureMode) async {
+        defer {
+            pendingRecentDeliveryDestination = nil
+        }
+
         switch result {
         case .success(let capture):
             do {
@@ -166,7 +172,7 @@ final class AppController {
                     guard prepareAccessibilityForDelivery(saved: saved) else {
                         return
                     }
-                    presentDestinationPicker(for: saved)
+                    await continueDelivery(saved: saved)
                 } else if shouldCopyToClipboard {
                     TraceNotificationCenter.showCopied(enabled: true)
                 }
@@ -178,6 +184,24 @@ final class AppController {
                 return
             }
             showError(error.localizedDescription)
+        }
+    }
+
+    private func continueDelivery(saved: SavedCapture?) async {
+        switch settingsStore.settings.deliveryTargetMode {
+        case .chooseEachTime:
+            presentDestinationPicker(for: saved)
+        case .mostRecentApp:
+            guard let destination = pendingRecentDeliveryDestination else {
+                markDeliveryFailed(saved: saved)
+                TraceNotificationCenter.showDeliveryFailed(
+                    appName: "최근 사용 앱",
+                    message: "캡처 시작 직전에 사용하던 앱을 찾지 못했습니다.",
+                    enabled: true
+                )
+                return
+            }
+            await deliver(saved: saved, to: destination, window: nil)
         }
     }
 
@@ -288,7 +312,29 @@ final class AppController {
         storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .failed)
     }
 
-    private func deliver(saved: SavedCapture?, to destination: AppDestination, window: AppWindowDestination) async {
+    private func currentExternalFrontmostApplication() -> AppDestination? {
+        guard let application = NSWorkspace.shared.frontmostApplication,
+              application.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              application.activationPolicy == .regular
+        else {
+            return nil
+        }
+
+        let name = application.localizedName ?? application.bundleIdentifier ?? "Unknown"
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+
+        return AppDestination(
+            bundleIdentifier: application.bundleIdentifier,
+            name: name,
+            icon: application.icon ?? NSImage(size: NSSize(width: 32, height: 32)),
+            isActive: application.isActive,
+            application: application
+        )
+    }
+
+    private func deliver(saved: SavedCapture?, to destination: AppDestination, window: AppWindowDestination?) async {
         destinationWindow?.close()
         do {
             try await deliveryService.deliver(to: destination, window: window)

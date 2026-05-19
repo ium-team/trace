@@ -87,7 +87,8 @@ YYYY-MM-DD_HH-mm-ss-3.png
   "deliveryCaptureShortcut": "command+shift+3",
   "defaultCaptureMode": "copyOnly",
   "basicCaptureAction": "copyAndSave",
-  "deliveryCaptureAction": "copySaveAndDeliver"
+  "deliveryCaptureAction": "copySaveAndDeliver",
+  "deliveryTargetMode": "chooseEachTime"
 }
 ```
 
