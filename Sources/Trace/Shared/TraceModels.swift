@@ -234,6 +234,7 @@ struct TraceSettings: Codable, Equatable {
     enum DeliveryTargetMode: String, Codable, CaseIterable, Identifiable {
         case chooseEachTime
         case mostRecentApp
+        case fixedApp
 
         var id: String { rawValue }
 
@@ -243,6 +244,24 @@ struct TraceSettings: Codable, Equatable {
                 "매번 앱 선택"
             case .mostRecentApp:
                 "가장 최근 사용 앱"
+            case .fixedApp:
+                "지정한 앱"
+            }
+        }
+    }
+
+    enum FixedAppWindowMode: String, Codable, CaseIterable, Identifiable {
+        case mostRecentWindow
+        case chooseWindow
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .mostRecentWindow:
+                "가장 최근 사용 윈도우"
+            case .chooseWindow:
+                "윈도우 선택"
             }
         }
     }
@@ -318,6 +337,9 @@ struct TraceSettings: Codable, Equatable {
     var basicCaptureAction: BasicCaptureAction
     var deliveryCaptureAction: DeliveryCaptureAction
     var deliveryTargetMode: DeliveryTargetMode
+    var fixedDeliveryAppBundleIdentifier: String?
+    var fixedDeliveryAppName: String?
+    var fixedDeliveryAppWindowMode: FixedAppWindowMode
     var fileNameRule: FileNameRule
     var dateFileNameFormat: DateFileNameFormat
     var sequenceStyle: SequenceStyle
@@ -339,6 +361,9 @@ struct TraceSettings: Codable, Equatable {
         basicCaptureAction: .copyAndSave,
         deliveryCaptureAction: .copySaveAndDeliver,
         deliveryTargetMode: .chooseEachTime,
+        fixedDeliveryAppBundleIdentifier: nil,
+        fixedDeliveryAppName: nil,
+        fixedDeliveryAppWindowMode: .mostRecentWindow,
         fileNameRule: .dateTime,
         dateFileNameFormat: .yearMonthDayHourMinuteSecond,
         sequenceStyle: .numeric
@@ -354,6 +379,9 @@ struct TraceSettings: Codable, Equatable {
         case basicCaptureAction
         case deliveryCaptureAction
         case deliveryTargetMode
+        case fixedDeliveryAppBundleIdentifier
+        case fixedDeliveryAppName
+        case fixedDeliveryAppWindowMode
         case fileNameRule
         case dateFileNameFormat
         case sequenceStyle
@@ -369,6 +397,9 @@ struct TraceSettings: Codable, Equatable {
         basicCaptureAction: BasicCaptureAction = .copyAndSave,
         deliveryCaptureAction: DeliveryCaptureAction = .copySaveAndDeliver,
         deliveryTargetMode: DeliveryTargetMode = .chooseEachTime,
+        fixedDeliveryAppBundleIdentifier: String? = nil,
+        fixedDeliveryAppName: String? = nil,
+        fixedDeliveryAppWindowMode: FixedAppWindowMode = .mostRecentWindow,
         fileNameRule: FileNameRule = .dateTime,
         dateFileNameFormat: DateFileNameFormat = .yearMonthDayHourMinuteSecond,
         sequenceStyle: SequenceStyle = .numeric
@@ -382,6 +413,9 @@ struct TraceSettings: Codable, Equatable {
         self.basicCaptureAction = basicCaptureAction
         self.deliveryCaptureAction = deliveryCaptureAction
         self.deliveryTargetMode = deliveryTargetMode
+        self.fixedDeliveryAppBundleIdentifier = fixedDeliveryAppBundleIdentifier
+        self.fixedDeliveryAppName = fixedDeliveryAppName
+        self.fixedDeliveryAppWindowMode = fixedDeliveryAppWindowMode
         self.fileNameRule = fileNameRule
         self.dateFileNameFormat = dateFileNameFormat
         self.sequenceStyle = sequenceStyle
@@ -398,6 +432,9 @@ struct TraceSettings: Codable, Equatable {
         basicCaptureAction = try container.decodeIfPresent(BasicCaptureAction.self, forKey: .basicCaptureAction) ?? .copyAndSave
         deliveryCaptureAction = try container.decodeIfPresent(DeliveryCaptureAction.self, forKey: .deliveryCaptureAction) ?? .copySaveAndDeliver
         deliveryTargetMode = try container.decodeIfPresent(DeliveryTargetMode.self, forKey: .deliveryTargetMode) ?? .chooseEachTime
+        fixedDeliveryAppBundleIdentifier = try container.decodeIfPresent(String.self, forKey: .fixedDeliveryAppBundleIdentifier)
+        fixedDeliveryAppName = try container.decodeIfPresent(String.self, forKey: .fixedDeliveryAppName)
+        fixedDeliveryAppWindowMode = try container.decodeIfPresent(FixedAppWindowMode.self, forKey: .fixedDeliveryAppWindowMode) ?? .mostRecentWindow
         fileNameRule = try container.decodeIfPresent(FileNameRule.self, forKey: .fileNameRule) ?? .dateTime
         dateFileNameFormat = try container.decodeIfPresent(DateFileNameFormat.self, forKey: .dateFileNameFormat) ?? .yearMonthDayHourMinuteSecond
         sequenceStyle = try container.decodeIfPresent(SequenceStyle.self, forKey: .sequenceStyle) ?? .numeric

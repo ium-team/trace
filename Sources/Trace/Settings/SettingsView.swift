@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var hasScreenRecordingPermission = PermissionService.hasScreenRecordingPermission
     @State private var hasAccessibilityPermission = PermissionService.hasAccessibilityPermission
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var runningDeliveryApps: [DeliveryAppOption] = []
 
     init(settingsStore: SettingsStore) {
         self.settingsStore = settingsStore
@@ -87,8 +88,21 @@ struct SettingsView: View {
                         Text(mode.title).tag(mode)
                     }
                 }
+                if draft.deliveryTargetMode == .fixedApp {
+                    Picker("지정 앱", selection: fixedDeliveryAppSelection) {
+                        Text("선택 안 함").tag("")
+                        ForEach(deliveryAppOptions) { app in
+                            Text(app.name).tag(app.bundleIdentifier)
+                        }
+                    }
+                    Picker("윈도우 처리", selection: $draft.fixedDeliveryAppWindowMode) {
+                        ForEach(TraceSettings.FixedAppWindowMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                }
                 TextField("전역 단축키", text: $draft.deliveryCaptureShortcut)
-                Text("가장 최근 사용 앱은 캡처를 시작하기 직전에 활성화되어 있던 앱으로 선택 창 없이 전달합니다. 저장하지 않는 전달 캡처는 히스토리에 남지 않습니다.")
+                Text("지정 앱은 현재 실행 중인 앱에서 선택합니다. 지정 앱이 전달 시점에 꺼져 있으면 실패 알림을 보냅니다. 저장하지 않는 전달 캡처는 히스토리에 남지 않습니다.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -122,18 +136,76 @@ struct SettingsView: View {
             draft = newValue
         }
         .task {
+            refreshRunningDeliveryApps()
             await refreshPermissionStatuses()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshRunningDeliveryApps()
             Task {
                 await refreshPermissionStatuses()
             }
         }
         .onReceive(Self.permissionRefreshTimer) { _ in
+            refreshRunningDeliveryApps()
             Task {
                 await refreshPermissionStatuses()
             }
         }
+    }
+
+    private var fixedDeliveryAppSelection: Binding<String> {
+        Binding(
+            get: {
+                draft.fixedDeliveryAppBundleIdentifier ?? ""
+            },
+            set: { bundleIdentifier in
+                guard !bundleIdentifier.isEmpty else {
+                    draft.fixedDeliveryAppBundleIdentifier = nil
+                    draft.fixedDeliveryAppName = nil
+                    return
+                }
+
+                draft.fixedDeliveryAppBundleIdentifier = bundleIdentifier
+                draft.fixedDeliveryAppName = runningDeliveryApps.first {
+                    $0.bundleIdentifier == bundleIdentifier
+                }?.name ?? draft.fixedDeliveryAppName
+            }
+        )
+    }
+
+    private var deliveryAppOptions: [DeliveryAppOption] {
+        guard let bundleIdentifier = draft.fixedDeliveryAppBundleIdentifier,
+              !bundleIdentifier.isEmpty,
+              !runningDeliveryApps.contains(where: { $0.bundleIdentifier == bundleIdentifier })
+        else {
+            return runningDeliveryApps
+        }
+
+        let name = draft.fixedDeliveryAppName ?? bundleIdentifier
+        return [DeliveryAppOption(bundleIdentifier: bundleIdentifier, name: "\(name) (실행 중 아님)")] + runningDeliveryApps
+    }
+
+    private func refreshRunningDeliveryApps() {
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        runningDeliveryApps = NSWorkspace.shared.runningApplications
+            .filter { app in
+                app.processIdentifier != ownPID &&
+                app.activationPolicy == .regular &&
+                app.bundleIdentifier?.isEmpty == false &&
+                app.localizedName?.isEmpty == false
+            }
+            .compactMap { app in
+                guard let bundleIdentifier = app.bundleIdentifier,
+                      let name = app.localizedName
+                else {
+                    return nil
+                }
+                return DeliveryAppOption(bundleIdentifier: bundleIdentifier, name: name)
+            }
+            .uniquedByBundleIdentifier()
+            .sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
     }
 
     private func chooseDirectory() {
@@ -188,5 +260,18 @@ struct PermissionRow: View {
             Spacer()
             Button("설정 열기", action: action)
         }
+    }
+}
+
+private struct DeliveryAppOption: Identifiable, Hashable {
+    var id: String { bundleIdentifier }
+    var bundleIdentifier: String
+    var name: String
+}
+
+private extension Array where Element == DeliveryAppOption {
+    func uniquedByBundleIdentifier() -> [DeliveryAppOption] {
+        var seen = Set<String>()
+        return filter { seen.insert($0.bundleIdentifier).inserted }
     }
 }

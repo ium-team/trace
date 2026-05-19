@@ -88,7 +88,10 @@ YYYY-MM-DD_HH-mm-ss-3.png
   "defaultCaptureMode": "copyOnly",
   "basicCaptureAction": "copyAndSave",
   "deliveryCaptureAction": "copySaveAndDeliver",
-  "deliveryTargetMode": "chooseEachTime"
+  "deliveryTargetMode": "chooseEachTime",
+  "fixedDeliveryAppBundleIdentifier": "com.apple.TextEdit",
+  "fixedDeliveryAppName": "TextEdit",
+  "fixedDeliveryAppWindowMode": "mostRecentWindow"
 }
 ```
 

@@ -39,6 +39,10 @@ final class DeliveryService {
             }
     }
 
+    func runningApp(bundleIdentifier: String) -> AppDestination? {
+        runningApps().first { $0.bundleIdentifier == bundleIdentifier }
+    }
+
     func windows(for destination: AppDestination) async -> [AppWindowDestination] {
         let visibleWindows = sessionWindows(for: destination)
         let accessibilityWindows = accessibilityWindows(for: destination)

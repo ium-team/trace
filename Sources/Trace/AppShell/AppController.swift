@@ -202,7 +202,46 @@ final class AppController {
                 return
             }
             await deliver(saved: saved, to: destination, window: nil)
+        case .fixedApp:
+            await continueFixedAppDelivery(saved: saved)
         }
+    }
+
+    private func continueFixedAppDelivery(saved: SavedCapture?) async {
+        let settings = settingsStore.settings
+        let appName = settings.fixedDeliveryAppName ?? "지정 앱"
+        guard let bundleIdentifier = settings.fixedDeliveryAppBundleIdentifier else {
+            markDeliveryFailed(saved: saved)
+            TraceNotificationCenter.showDeliveryFailed(
+                appName: appName,
+                message: "설정에서 전달할 앱을 먼저 선택해야 합니다.",
+                enabled: true
+            )
+            return
+        }
+
+        guard let destination = deliveryService.runningApp(bundleIdentifier: bundleIdentifier) else {
+            markDeliveryFailed(saved: saved)
+            TraceNotificationCenter.showDeliveryFailed(
+                appName: appName,
+                message: "앱이 실행 중이 아닙니다.",
+                enabled: true
+            )
+            return
+        }
+
+        switch settings.fixedDeliveryAppWindowMode {
+        case .mostRecentWindow:
+            let window = await mostRecentWindow(for: destination)
+            await deliver(saved: saved, to: destination, window: window)
+        case .chooseWindow:
+            await presentFixedAppWindowPicker(for: saved, destination: destination)
+        }
+    }
+
+    private func mostRecentWindow(for destination: AppDestination) async -> AppWindowDestination? {
+        let windows = await deliveryService.windows(for: destination)
+        return windows.first { $0.isMain } ?? windows.first
     }
 
     private func saveIfNeeded(capture: CaptureResult, mode: CaptureMode) throws -> SavedCapture? {
@@ -261,8 +300,51 @@ final class AppController {
             app: destination,
             windows: windows,
             appSpecificDestinations: appSpecificDestinations,
+            backLabel: "앱",
             onBack: { [weak self] in
                 self?.presentDestinationPicker(for: saved)
+            },
+            onSkip: { [weak self] in
+                if let saved {
+                    self?.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .skipped)
+                }
+                self?.destinationWindow?.close()
+            },
+            onSelectWindow: { [weak self] window in
+                Task { @MainActor in
+                    await self?.deliver(saved: saved, to: destination, window: window)
+                }
+            },
+            onSelectAppSpecificDestination: { [weak self] appSpecificDestination in
+                Task { @MainActor in
+                    await self?.deliver(saved: saved, to: destination, appSpecificTarget: appSpecificDestination)
+                }
+            }
+        )
+
+        if destinationWindow == nil {
+            destinationWindow = makeDeliveryOverlayWindow(size: NSSize(width: 760, height: 540), rootView: view)
+        } else {
+            destinationWindow?.contentViewController = NSHostingController(rootView: view)
+            destinationWindow?.setContentSize(NSSize(width: 760, height: 540))
+            destinationWindow?.center()
+        }
+        showDeliveryOverlayWindow(destinationWindow)
+    }
+
+    private func presentFixedAppWindowPicker(for saved: SavedCapture?, destination: AppDestination) async {
+        let windows = await deliveryService.windows(for: destination)
+        let appSpecificDestinations = deliveryService.appSpecificDestinations(for: destination)
+        let view = WindowPickerView(
+            app: destination,
+            windows: windows,
+            appSpecificDestinations: appSpecificDestinations,
+            backLabel: "닫기",
+            onBack: { [weak self] in
+                if let saved {
+                    self?.storage.updateDelivery(itemID: saved.item.id, appName: nil, state: .skipped)
+                }
+                self?.destinationWindow?.close()
             },
             onSkip: { [weak self] in
                 if let saved {

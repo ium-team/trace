@@ -61,6 +61,7 @@ struct WindowPickerView: View {
     let app: AppDestination
     let windows: [AppWindowDestination]
     let appSpecificDestinations: [AppSpecificDestination]
+    let backLabel: String
     let onBack: () -> Void
     let onSkip: () -> Void
     let onSelectWindow: (AppWindowDestination) -> Void
@@ -74,7 +75,7 @@ struct WindowPickerView: View {
         DeliveryPanel {
             HStack(alignment: .center, spacing: 14) {
                 Button(action: onBack) {
-                    Label("앱", systemImage: "chevron.left")
+                    Label(backLabel, systemImage: "chevron.left")
                 }
                 .buttonStyle(SecondaryCapsuleButtonStyle())
 

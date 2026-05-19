@@ -172,6 +172,9 @@ defaultCaptureMode
 basicCaptureAction
 deliveryCaptureAction
 deliveryTargetMode
+fixedDeliveryAppBundleIdentifier
+fixedDeliveryAppName
+fixedDeliveryAppWindowMode
 ```
 
 ## 핵심 흐름
@@ -198,6 +201,7 @@ GlobalShortcut
   -> Storage.save if deliveryCaptureAction is copySaveAndDeliver
   -> DeliveryDestinationPicker and DeliveryWindowPicker if deliveryTargetMode is chooseEachTime
   -> Most recent frontmost app if deliveryTargetMode is mostRecentApp
+  -> Fixed app and most recent window or fixed app window picker if deliveryTargetMode is fixedApp
   -> Delivery.deliver
   -> History.refresh if saved
 ```
