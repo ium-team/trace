@@ -15,6 +15,7 @@ final class AppController {
     private var destinationWindow: NSWindow?
     private var lastSettingsSnapshot: TraceSettings?
     private var pendingRecentDeliveryDestination: AppDestination?
+    private var statusMenu: NSMenu?
 
     func start() {
         settingsStore.save()
@@ -31,7 +32,9 @@ final class AppController {
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = "Trace"
-        item.menu = makeMenu()
+        let menu = makeMenu()
+        item.menu = menu
+        statusMenu = menu
         statusItem = item
     }
 
@@ -54,6 +57,10 @@ final class AppController {
         let settingsItem = NSMenuItem(title: "설정 열기", action: #selector(openSettingsFromMenu), keyEquivalent: "")
         settingsItem.target = self
         menu.addItem(settingsItem)
+
+        let quickSettingsItem = NSMenuItem(title: "빠른 설정", action: nil, keyEquivalent: "")
+        quickSettingsItem.submenu = makeQuickSettingsMenu()
+        menu.addItem(quickSettingsItem)
 
         menu.addItem(.separator())
 
@@ -96,6 +103,176 @@ final class AppController {
                 NSLog("Trace rename-all failed: \(error.localizedDescription)")
             }
         }
+
+        refreshQuickSettingsMenuIfNeeded()
+    }
+
+    private func makeQuickSettingsMenu() -> NSMenu {
+        let menu = NSMenu()
+
+        let autoCopyItem = NSMenuItem(title: "캡처 후 자동 복사", action: #selector(toggleAutoCopyFromMenu), keyEquivalent: "")
+        autoCopyItem.target = self
+        menu.addItem(autoCopyItem)
+
+        menu.addItem(.separator())
+
+        let defaultModeItem = NSMenuItem(title: "기본 캡처 방식", action: nil, keyEquivalent: "")
+        defaultModeItem.submenu = makeDefaultModeMenu()
+        menu.addItem(defaultModeItem)
+
+        let basicActionItem = NSMenuItem(title: "기본 캡처 완료 후 동작", action: nil, keyEquivalent: "")
+        basicActionItem.submenu = makeBasicActionMenu()
+        menu.addItem(basicActionItem)
+
+        let deliveryActionItem = NSMenuItem(title: "전달 캡처 완료 후 동작", action: nil, keyEquivalent: "")
+        deliveryActionItem.submenu = makeDeliveryActionMenu()
+        menu.addItem(deliveryActionItem)
+
+        let deliveryTargetItem = NSMenuItem(title: "전달 대상", action: nil, keyEquivalent: "")
+        deliveryTargetItem.submenu = makeDeliveryTargetMenu()
+        menu.addItem(deliveryTargetItem)
+
+        updateQuickSettingsMenuState(menu)
+        return menu
+    }
+
+    private func makeDefaultModeMenu() -> NSMenu {
+        let menu = NSMenu()
+        for mode in CaptureMode.allCases {
+            let item = NSMenuItem(title: mode.title, action: #selector(selectDefaultCaptureModeFromMenu(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = mode.rawValue
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    private func makeBasicActionMenu() -> NSMenu {
+        let menu = NSMenu()
+        for action in TraceSettings.BasicCaptureAction.allCases {
+            let item = NSMenuItem(title: action.title, action: #selector(selectBasicCaptureActionFromMenu(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = action.rawValue
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    private func makeDeliveryActionMenu() -> NSMenu {
+        let menu = NSMenu()
+        for action in TraceSettings.DeliveryCaptureAction.allCases {
+            let item = NSMenuItem(title: action.title, action: #selector(selectDeliveryCaptureActionFromMenu(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = action.rawValue
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    private func makeDeliveryTargetMenu() -> NSMenu {
+        let menu = NSMenu()
+        for target in TraceSettings.DeliveryTargetMode.allCases {
+            let item = NSMenuItem(title: target.title, action: #selector(selectDeliveryTargetModeFromMenu(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = target.rawValue
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    private func refreshQuickSettingsMenuIfNeeded() {
+        guard let rootMenu = statusMenu,
+              let quickSettingsMenu = rootMenu.item(withTitle: "빠른 설정")?.submenu
+        else {
+            return
+        }
+
+        updateQuickSettingsMenuState(quickSettingsMenu)
+    }
+
+    private func updateQuickSettingsMenuState(_ menu: NSMenu) {
+        let settings = settingsStore.settings
+
+        if let autoCopyItem = menu.item(withTitle: "캡처 후 자동 복사") {
+            autoCopyItem.state = settings.copyToClipboardByDefault ? .on : .off
+        }
+
+        if let defaultModeMenu = menu.item(withTitle: "기본 캡처 방식")?.submenu {
+            updateSubmenuState(defaultModeMenu, selectedRawValue: settings.defaultCaptureMode.rawValue)
+        }
+
+        if let basicActionMenu = menu.item(withTitle: "기본 캡처 완료 후 동작")?.submenu {
+            updateSubmenuState(basicActionMenu, selectedRawValue: settings.basicCaptureAction.rawValue)
+        }
+
+        if let deliveryActionMenu = menu.item(withTitle: "전달 캡처 완료 후 동작")?.submenu {
+            updateSubmenuState(deliveryActionMenu, selectedRawValue: settings.deliveryCaptureAction.rawValue)
+        }
+
+        if let deliveryTargetMenu = menu.item(withTitle: "전달 대상")?.submenu {
+            updateSubmenuState(deliveryTargetMenu, selectedRawValue: settings.deliveryTargetMode.rawValue)
+        }
+    }
+
+    private func updateSubmenuState(_ menu: NSMenu, selectedRawValue: String) {
+        menu.items.forEach { item in
+            let rawValue = item.representedObject as? String
+            item.state = rawValue == selectedRawValue ? .on : .off
+        }
+    }
+
+    @objc private func toggleAutoCopyFromMenu() {
+        var updated = settingsStore.settings
+        updated.copyToClipboardByDefault.toggle()
+        settingsStore.update(updated)
+    }
+
+    @objc private func selectDefaultCaptureModeFromMenu(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let mode = CaptureMode(rawValue: rawValue)
+        else {
+            return
+        }
+
+        var updated = settingsStore.settings
+        updated.defaultCaptureMode = mode
+        settingsStore.update(updated)
+    }
+
+    @objc private func selectBasicCaptureActionFromMenu(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let action = TraceSettings.BasicCaptureAction(rawValue: rawValue)
+        else {
+            return
+        }
+
+        var updated = settingsStore.settings
+        updated.basicCaptureAction = action
+        settingsStore.update(updated)
+    }
+
+    @objc private func selectDeliveryCaptureActionFromMenu(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let action = TraceSettings.DeliveryCaptureAction(rawValue: rawValue)
+        else {
+            return
+        }
+
+        var updated = settingsStore.settings
+        updated.deliveryCaptureAction = action
+        settingsStore.update(updated)
+    }
+
+    @objc private func selectDeliveryTargetModeFromMenu(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let mode = TraceSettings.DeliveryTargetMode(rawValue: rawValue)
+        else {
+            return
+        }
+
+        var updated = settingsStore.settings
+        updated.deliveryTargetMode = mode
+        settingsStore.update(updated)
     }
 
     @objc private func startCaptureFromMenu() {

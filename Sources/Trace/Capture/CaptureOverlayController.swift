@@ -36,11 +36,13 @@ final class CaptureOverlayController {
         self.completion = completion
 
         sessions = NSScreen.screens.map { screen in
-            let view = CaptureOverlayView(frame: NSRect(origin: .zero, size: screen.frame.size))
+            let menuBarHeight = max(0, screen.frame.maxY - screen.visibleFrame.maxY)
+            let overlaySize = NSSize(width: screen.frame.width, height: max(1, screen.frame.height - menuBarHeight))
+            let view = CaptureOverlayView(frame: NSRect(origin: .zero, size: overlaySize))
             view.plan = defaultPlan
             view.bottomSafeInset = max(0, screen.visibleFrame.minY - screen.frame.minY)
             let window = OverlayPanel(
-                contentRect: screen.frame,
+                contentRect: NSRect(x: screen.frame.minX, y: screen.frame.minY, width: overlaySize.width, height: overlaySize.height),
                 styleMask: [.borderless],
                 backing: .buffered,
                 defer: false
@@ -232,13 +234,18 @@ final class CaptureOverlayController {
             captureFromKeyInput()
             return true
         default:
-            if event.modifierFlags.contains(.command),
+            if isCaptureConfirmationShortcut(event),
                event.charactersIgnoringModifiers?.lowercased() == "c" {
                 captureFromKeyInput()
                 return true
             }
             return false
         }
+    }
+
+    private func isCaptureConfirmationShortcut(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        return modifiers == .command || modifiers == .control
     }
 
     private func captureFromKeyInput() {
@@ -399,13 +406,18 @@ final class CaptureOverlayView: NSView {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.contains(.command),
+        if isCaptureConfirmationShortcut(event),
            event.charactersIgnoringModifiers?.lowercased() == "c" {
             capturePressed()
             return true
         }
 
         return super.performKeyEquivalent(with: event)
+    }
+
+    private func isCaptureConfirmationShortcut(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        return modifiers == .command || modifiers == .control
     }
 
     private func setupToolbar() {
