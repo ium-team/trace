@@ -234,6 +234,97 @@ final class CaptureStorage {
         metadata = nextMetadata
     }
 
+    func applyNamingRuleToAllCaptures() throws {
+        var nextMetadata = metadata
+        let orderedIndices = nextMetadata.captures.indices.sorted {
+            nextMetadata.captures[$0].createdAt < nextMetadata.captures[$1].createdAt
+        }
+
+        struct RenamePlan {
+            let index: Int
+            let baseName: String
+        }
+
+        let plans: [RenamePlan] = orderedIndices.enumerated().map { offset, index in
+            let item = nextMetadata.captures[index]
+            let baseName: String
+            switch settingsStore.settings.fileNameRule {
+            case .dateTime:
+                baseName = formatter(for: settingsStore.settings.dateFileNameFormat).string(from: item.createdAt)
+            case .sequence:
+                baseName = sequenceBaseName(offset: offset, style: settingsStore.settings.sequenceStyle)
+            }
+            return RenamePlan(index: index, baseName: baseName)
+        }
+
+        let rootURL = settingsStore.rootURL
+        let tempSuffix = UUID().uuidString
+        var tempImageURLs: [Int: URL] = [:]
+        var tempThumbnailURLs: [Int: URL] = [:]
+
+        for plan in plans {
+            let item = nextMetadata.captures[plan.index]
+            let imageURL = absoluteURL(for: item.filePath)
+            if fileManager.fileExists(atPath: imageURL.path) {
+                let tempImageURL = uniqueURL(
+                    directory: imageURL.deletingLastPathComponent(),
+                    baseName: "__trace_tmp_\(tempSuffix)",
+                    extension: imageURL.pathExtension.isEmpty ? "png" : imageURL.pathExtension
+                )
+                try fileManager.moveItem(at: imageURL, to: tempImageURL)
+                tempImageURLs[plan.index] = tempImageURL
+                nextMetadata.captures[plan.index].filePath = tempImageURL.relativePath(from: rootURL)
+            }
+
+            if let thumbnailPath = item.thumbnailPath {
+                let thumbnailURL = absoluteURL(for: thumbnailPath)
+                if fileManager.fileExists(atPath: thumbnailURL.path) {
+                    let tempThumbnailURL = uniqueURL(
+                        directory: thumbnailURL.deletingLastPathComponent(),
+                        baseName: "__trace_tmp_thumb_\(tempSuffix)",
+                        extension: thumbnailURL.pathExtension.isEmpty ? "jpg" : thumbnailURL.pathExtension
+                    )
+                    try fileManager.moveItem(at: thumbnailURL, to: tempThumbnailURL)
+                    tempThumbnailURLs[plan.index] = tempThumbnailURL
+                    nextMetadata.captures[plan.index].thumbnailPath = tempThumbnailURL.relativePath(from: rootURL)
+                }
+            }
+        }
+
+        for plan in plans {
+            let imageExtension: String
+            if let tempImageURL = tempImageURLs[plan.index] {
+                imageExtension = tempImageURL.pathExtension.isEmpty ? "png" : tempImageURL.pathExtension
+                let finalImageURL = uniqueURL(
+                    directory: tempImageURL.deletingLastPathComponent(),
+                    baseName: plan.baseName,
+                    extension: imageExtension
+                )
+                try fileManager.moveItem(at: tempImageURL, to: finalImageURL)
+                nextMetadata.captures[plan.index].filePath = finalImageURL.relativePath(from: rootURL)
+            } else {
+                let currentPath = nextMetadata.captures[plan.index].filePath
+                imageExtension = URL(fileURLWithPath: currentPath).pathExtension.isEmpty ? "png" : URL(fileURLWithPath: currentPath).pathExtension
+            }
+
+            if let tempThumbnailURL = tempThumbnailURLs[plan.index] {
+                let thumbnailExtension = tempThumbnailURL.pathExtension.isEmpty ? "jpg" : tempThumbnailURL.pathExtension
+                let finalThumbnailURL = uniqueURL(
+                    directory: tempThumbnailURL.deletingLastPathComponent(),
+                    baseName: plan.baseName,
+                    extension: thumbnailExtension
+                )
+                try fileManager.moveItem(at: tempThumbnailURL, to: finalThumbnailURL)
+                nextMetadata.captures[plan.index].thumbnailPath = finalThumbnailURL.relativePath(from: rootURL)
+            }
+
+            nextMetadata.captures[plan.index].title = plan.baseName
+        }
+
+        try writeMetadata(nextMetadata)
+        metadata = nextMetadata
+    }
+
     func fileExists(for item: CaptureItem) -> Bool {
         fileManager.fileExists(atPath: absoluteURL(for: item.filePath).path)
     }
@@ -343,6 +434,19 @@ final class CaptureStorage {
             return nil
         }
         return (cycle - 1) * letters.count + letterIndex
+    }
+
+    private func sequenceBaseName(offset: Int, style: TraceSettings.SequenceStyle) -> String {
+        switch style {
+        case .numeric:
+            return String(format: "%03d", offset + 1)
+        case .koreanAlphabet:
+            let letters = ["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하"]
+            let letterIndex = offset % letters.count
+            let cycle = (offset / letters.count) + 1
+            let letter = letters[letterIndex]
+            return cycle == 1 ? letter : "\(letter)\(cycle)"
+        }
     }
 
     private func writeMetadata() throws {

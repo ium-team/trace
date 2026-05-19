@@ -13,11 +13,13 @@ final class AppController {
     private var historyWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var destinationWindow: NSWindow?
+    private var lastSettingsSnapshot: TraceSettings?
 
     func start() {
         settingsStore.save()
+        lastSettingsSnapshot = settingsStore.settings
         settingsStore.onUpdate = { [weak self] _ in
-            self?.registerHotKeys()
+            self?.handleSettingsChanged()
         }
         TraceNotificationCenter.configure()
         TraceNotificationCenter.requestIfNeeded(enabled: true)
@@ -72,6 +74,27 @@ final class AppController {
                 Task { @MainActor in self?.startInteractiveCapture(defaultPlan: .areaDelivery) }
             }
         )
+    }
+
+    private func handleSettingsChanged() {
+        let current = settingsStore.settings
+        let previous = lastSettingsSnapshot
+        lastSettingsSnapshot = current
+
+        if previous?.basicCaptureShortcut != current.basicCaptureShortcut ||
+            previous?.deliveryCaptureShortcut != current.deliveryCaptureShortcut {
+            registerHotKeys()
+        }
+
+        if previous?.fileNameRule != current.fileNameRule ||
+            previous?.dateFileNameFormat != current.dateFileNameFormat ||
+            previous?.sequenceStyle != current.sequenceStyle {
+            do {
+                try storage.applyNamingRuleToAllCaptures()
+            } catch {
+                NSLog("Trace rename-all failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     @objc private func startCaptureFromMenu() {
