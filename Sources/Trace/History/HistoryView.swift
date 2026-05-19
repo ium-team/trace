@@ -2,7 +2,6 @@ import AppKit
 import SwiftUI
 
 private enum HistorySectionKey: Hashable {
-    case pinned
     case recent
     case day(String)
 }
@@ -15,7 +14,7 @@ struct HistoryView: View {
     @State private var message: String?
     @State private var pendingName = ""
     @State private var isShowingDeleteConfirmation = false
-    @State private var expandedSections = Set<HistorySectionKey>([.pinned, .recent])
+    @State private var expandedSections = Set<HistorySectionKey>([.recent])
 
     private var selectedItems: [CaptureItem] {
         storage.captures.filter { selectedItemIDs.contains($0.id) }
@@ -33,20 +32,13 @@ struct HistoryView: View {
         NavigationSplitView {
             List(selection: $selectedItemIDs) {
                 if !storage.pinnedCaptures.isEmpty {
-                    DisclosureGroup(
-                        isExpanded: bindingForSection(.pinned),
-                        content: {
-                            ForEach(storage.pinnedCaptures) { item in
-                                HistoryRow(item: item, storage: storage)
-                                    .tag(item.id)
-                                    .contextMenu { rowContextMenu(for: item) }
-                            }
-                        },
-                        label: {
-                            Text("고정")
+                    Section("고정") {
+                        ForEach(storage.pinnedCaptures) { item in
+                            HistoryRow(item: item, storage: storage)
+                                .tag(item.id)
+                                .contextMenu { rowContextMenu(for: item) }
                         }
-                    )
-                    .tag(HistorySectionKey.pinned)
+                    }
                 }
 
                 DisclosureGroup(
@@ -205,7 +197,7 @@ struct HistoryView: View {
 
     private func initializeExpandedSectionsIfNeeded() {
         let dayKeys = storage.groupedByDay().map { HistorySectionKey.day($0.0) }
-        let defaults: Set<HistorySectionKey> = Set([.pinned, .recent] + dayKeys.prefix(2))
+        let defaults: Set<HistorySectionKey> = Set([.recent] + dayKeys.prefix(2))
         if expandedSections.isEmpty {
             expandedSections = defaults
         } else {
@@ -215,9 +207,9 @@ struct HistoryView: View {
 
     private func toggleSectionExpansion() {
         if expandedSections.count > 2 {
-            expandedSections = [.pinned, .recent]
+            expandedSections = [.recent]
         } else {
-            expandedSections = Set(storage.groupedByDay().map { HistorySectionKey.day($0.0) } + [.pinned, .recent])
+            expandedSections = Set(storage.groupedByDay().map { HistorySectionKey.day($0.0) } + [.recent])
         }
     }
 
