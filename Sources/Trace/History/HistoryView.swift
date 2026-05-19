@@ -15,6 +15,7 @@ struct HistoryView: View {
     @State private var isShowingDeleteConfirmation = false
     @State private var isShowingRenameSheet = false
     @State private var expandedSections = Set<HistorySectionKey>([.recent])
+    @State private var isSidebarVisible = true
 
     private var selectedItems: [CaptureItem] {
         storage.captures.filter { selectedItemIDs.contains($0.id) }
@@ -29,67 +30,27 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selectedItemIDs) {
-                if !storage.pinnedCaptures.isEmpty {
-                    Section("고정") {
-                        ForEach(storage.pinnedCaptures) { item in
-                            HistoryRow(item: item, storage: storage)
-                                .tag(item.id)
-                                .contextMenu { rowContextMenu(for: item) }
-                        }
-                    }
-                }
+        HStack(spacing: 0) {
+            sidebarList
+                .frame(width: 360)
+                .opacity(isSidebarVisible ? 1 : 0)
+                .allowsHitTesting(isSidebarVisible)
 
-                DisclosureGroup(
-                    isExpanded: bindingForSection(.recent),
-                    content: {
-                        ForEach(storage.captures.filter { !$0.isPinned }.prefix(8)) { item in
-                            HistoryRow(item: item, storage: storage)
-                                .tag(item.id)
-                                .contextMenu { rowContextMenu(for: item) }
-                        }
-                    },
-                    label: {
-                        Text("최근 캡처")
-                    }
-                )
-                .tag(HistorySectionKey.recent)
+            Divider()
 
-                ForEach(storage.groupedByDay(), id: \.0) { day, items in
-                    DisclosureGroup(
-                        isExpanded: bindingForSection(.day(day)),
-                        content: {
-                            ForEach(items.filter { !$0.isPinned }) { item in
-                                HistoryRow(item: item, storage: storage)
-                                    .tag(item.id)
-                                    .contextMenu { rowContextMenu(for: item) }
-                            }
-                        },
-                        label: {
-                            Text(day)
-                        }
+            Group {
+                if let primarySelectedItem {
+                    CapturePreview(
+                        item: primarySelectedItem,
+                        selectedCount: selectedCount,
+                        storage: storage,
+                        onRename: openRename,
                     )
-                    .tag(HistorySectionKey.day(day))
+                } else {
+                    ContentUnavailableView("캡처 선택", systemImage: "photo.on.rectangle")
                 }
             }
-            .frame(minWidth: 360)
-            .contextMenu {
-                if selectedCount > 1 {
-                    multiSelectionContextMenu
-                }
-            }
-        } detail: {
-            if let primarySelectedItem {
-                CapturePreview(
-                    item: primarySelectedItem,
-                    selectedCount: selectedCount,
-                    storage: storage,
-                    onRename: openRename,
-                )
-            } else {
-                ContentUnavailableView("캡처 선택", systemImage: "photo.on.rectangle")
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
@@ -190,6 +151,57 @@ struct HistoryView: View {
             Text("원본 이미지, 썸네일, 히스토리 항목이 함께 삭제됩니다.")
         }
         .frame(minWidth: 980, minHeight: 640)
+    }
+
+    private var sidebarList: some View {
+        List(selection: $selectedItemIDs) {
+            if !storage.pinnedCaptures.isEmpty {
+                Section("고정") {
+                    ForEach(storage.pinnedCaptures) { item in
+                        HistoryRow(item: item, storage: storage)
+                            .tag(item.id)
+                            .contextMenu { rowContextMenu(for: item) }
+                    }
+                }
+            }
+
+            DisclosureGroup(
+                isExpanded: bindingForSection(.recent),
+                content: {
+                    ForEach(storage.captures.filter { !$0.isPinned }.prefix(8)) { item in
+                        HistoryRow(item: item, storage: storage)
+                            .tag(item.id)
+                            .contextMenu { rowContextMenu(for: item) }
+                    }
+                },
+                label: {
+                    Text("최근 캡처")
+                }
+            )
+            .tag(HistorySectionKey.recent)
+
+            ForEach(storage.groupedByDay(), id: \.0) { day, items in
+                DisclosureGroup(
+                    isExpanded: bindingForSection(.day(day)),
+                    content: {
+                        ForEach(items.filter { !$0.isPinned }) { item in
+                            HistoryRow(item: item, storage: storage)
+                                .tag(item.id)
+                                .contextMenu { rowContextMenu(for: item) }
+                        }
+                    },
+                    label: {
+                        Text(day)
+                    }
+                )
+                .tag(HistorySectionKey.day(day))
+            }
+        }
+        .contextMenu {
+            if selectedCount > 1 {
+                multiSelectionContextMenu
+            }
+        }
     }
 
     private var multiSelectionContextMenu: some View {
@@ -344,7 +356,7 @@ struct HistoryView: View {
     }
 
     private func toggleSidebar() {
-        NSApp.sendAction(#selector(NSSplitViewController.toggleSidebar(_:)), to: nil, from: nil)
+        isSidebarVisible.toggle()
     }
 
     private func deleteSelection() {
