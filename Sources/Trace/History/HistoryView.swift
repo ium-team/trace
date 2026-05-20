@@ -30,72 +30,32 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebarList
-                .frame(width: 360)
-                .opacity(isSidebarVisible ? 1 : 0)
-                .allowsHitTesting(isSidebarVisible)
+        VStack(spacing: 0) {
+            historyCommandBar
 
             Divider()
 
-            Group {
-                if let primarySelectedItem {
-                    CapturePreview(
-                        item: primarySelectedItem,
-                        selectedCount: selectedCount,
-                        storage: storage,
-                        onRename: openRename,
-                    )
-                } else {
-                    ContentUnavailableView("캡처 선택", systemImage: "photo.on.rectangle")
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    toggleSidebar()
-                } label: {
-                    Label("사이드바", systemImage: "sidebar.left")
-                }
-            }
+            HStack(spacing: 0) {
+                sidebarList
+                    .frame(width: 360)
+                    .opacity(isSidebarVisible ? 1 : 0)
+                    .allowsHitTesting(isSidebarVisible)
 
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    togglePinnedForSelection()
-                } label: {
-                    Label(selectedItems.allSatisfy(\.isPinned) ? "고정 해제" : "고정", systemImage: selectedItems.allSatisfy(\.isPinned) ? "pin.slash" : "pin")
-                }
-                .disabled(selectedCount == 0)
+                Divider()
 
-                Button {
-                    toggleBookmarkedForSelection()
-                } label: {
-                    Label(selectedItems.allSatisfy(\.isBookmarked) ? "북마크 해제" : "북마크", systemImage: selectedItems.allSatisfy(\.isBookmarked) ? "bookmark.slash" : "bookmark")
+                Group {
+                    if let primarySelectedItem {
+                        CapturePreview(
+                            item: primarySelectedItem,
+                            selectedCount: selectedCount,
+                            storage: storage,
+                            onRename: openRename,
+                        )
+                    } else {
+                        ContentUnavailableView("캡처 선택", systemImage: "photo.on.rectangle")
+                    }
                 }
-                .disabled(selectedCount == 0)
-
-                Button {
-                    copyPrimarySelection()
-                } label: {
-                    Label("복사", systemImage: "doc.on.clipboard")
-                }
-                .disabled(selectedCount == 0)
-
-                Button {
-                    revealPrimarySelection()
-                } label: {
-                    Label("Finder", systemImage: "finder")
-                }
-                .disabled(selectedCount == 0)
-
-                Button(role: .destructive) {
-                    isShowingDeleteConfirmation = true
-                } label: {
-                    Label("삭제", systemImage: "trash")
-                }
-                .disabled(selectedCount == 0)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .alert("Trace", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
@@ -151,6 +111,75 @@ struct HistoryView: View {
             Text("원본 이미지, 썸네일, 히스토리 항목이 함께 삭제됩니다.")
         }
         .frame(minWidth: 980, minHeight: 640)
+    }
+
+    private var historyCommandBar: some View {
+        HStack(spacing: 12) {
+            Button {
+                toggleSidebar()
+            } label: {
+                Label("사이드바", systemImage: "sidebar.left")
+                    .labelStyle(.iconOnly)
+            }
+            .help("사이드바")
+
+            Divider()
+                .frame(height: 28)
+
+            HStack(spacing: 8) {
+                Button {
+                    togglePinnedForSelection()
+                } label: {
+                    Label(selectedItems.allSatisfy(\.isPinned) ? "고정 해제" : "고정", systemImage: selectedItems.allSatisfy(\.isPinned) ? "pin.slash" : "pin")
+                        .labelStyle(.iconOnly)
+                }
+                .disabled(selectedCount == 0)
+                .help(selectedItems.allSatisfy(\.isPinned) ? "고정 해제" : "고정")
+
+                Button {
+                    toggleBookmarkedForSelection()
+                } label: {
+                    Label(selectedItems.allSatisfy(\.isBookmarked) ? "북마크 해제" : "북마크", systemImage: selectedItems.allSatisfy(\.isBookmarked) ? "bookmark.slash" : "bookmark")
+                        .labelStyle(.iconOnly)
+                }
+                .disabled(selectedCount == 0)
+                .help(selectedItems.allSatisfy(\.isBookmarked) ? "북마크 해제" : "북마크")
+
+                Button {
+                    copyPrimarySelection()
+                } label: {
+                    Label("복사", systemImage: "doc.on.clipboard")
+                        .labelStyle(.iconOnly)
+                }
+                .disabled(selectedCount == 0)
+                .help("복사")
+
+                Button {
+                    revealPrimarySelection()
+                } label: {
+                    Label("Finder", systemImage: "finder")
+                        .labelStyle(.iconOnly)
+                }
+                .disabled(selectedCount == 0)
+                .help("Finder")
+
+                Button(role: .destructive) {
+                    isShowingDeleteConfirmation = true
+                } label: {
+                    Label("삭제", systemImage: "trash")
+                        .labelStyle(.iconOnly)
+                }
+                .disabled(selectedCount == 0)
+                .help("삭제")
+            }
+
+            Spacer(minLength: 0)
+        }
+        .controlSize(.large)
+        .buttonStyle(.bordered)
+        .padding(.horizontal, 18)
+        .frame(height: 54)
+        .background(.bar)
     }
 
     private var sidebarList: some View {
