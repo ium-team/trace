@@ -6,6 +6,25 @@ private enum HistorySectionKey: Hashable {
     case day(String)
 }
 
+@MainActor
+private final class HistoryImageCache {
+    static let shared = HistoryImageCache()
+
+    private let cache = NSCache<NSURL, NSImage>()
+
+    func image(for url: URL) -> NSImage? {
+        let key = url as NSURL
+        if let cachedImage = cache.object(forKey: key) {
+            return cachedImage
+        }
+        guard let image = NSImage(contentsOf: url) else {
+            return nil
+        }
+        cache.setObject(image, forKey: key)
+        return image
+    }
+}
+
 struct HistoryView: View {
     @Bindable var storage: CaptureStorage
 
@@ -30,33 +49,27 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            historyCommandBar
-
-            Divider()
-
-            HStack(spacing: 0) {
+        HStack(spacing: 0) {
+            if isSidebarVisible {
                 sidebarList
                     .frame(width: 360)
-                    .opacity(isSidebarVisible ? 1 : 0)
-                    .allowsHitTesting(isSidebarVisible)
 
                 Divider()
-
-                Group {
-                    if let primarySelectedItem {
-                        CapturePreview(
-                            item: primarySelectedItem,
-                            selectedCount: selectedCount,
-                            storage: storage,
-                            onRename: openRename,
-                        )
-                    } else {
-                        ContentUnavailableView("캡처 선택", systemImage: "photo.on.rectangle")
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+
+            Group {
+                if let primarySelectedItem {
+                    CapturePreview(
+                        item: primarySelectedItem,
+                        selectedCount: selectedCount,
+                        storage: storage,
+                        onRename: openRename,
+                    )
+                } else {
+                    ContentUnavailableView("캡처 선택", systemImage: "photo.on.rectangle")
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .alert("Trace", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("확인") { message = nil }
@@ -118,13 +131,7 @@ struct HistoryView: View {
                     Label("사이드바", systemImage: "sidebar.left")
                 }
             }
-        }
-        .frame(minWidth: 980, minHeight: 640)
-    }
-
-    private var historyCommandBar: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 8) {
+            ToolbarItemGroup(placement: .automatic) {
                 Button {
                     togglePinnedForSelection()
                 } label: {
@@ -170,14 +177,10 @@ struct HistoryView: View {
                 .disabled(selectedCount == 0)
                 .help("삭제")
             }
-
-            Spacer(minLength: 0)
         }
         .controlSize(.large)
         .buttonStyle(.bordered)
-        .padding(.horizontal, 18)
-        .frame(height: 54)
-        .background(.bar)
+        .frame(minWidth: 980, minHeight: 640)
     }
 
     private var sidebarList: some View {
@@ -383,7 +386,9 @@ struct HistoryView: View {
     }
 
     private func toggleSidebar() {
-        isSidebarVisible.toggle()
+        withAnimation(.easeInOut(duration: 0.16)) {
+            isSidebarVisible.toggle()
+        }
     }
 
     private func deleteSelection() {
@@ -404,7 +409,7 @@ struct HistoryRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            ThumbnailView(url: thumbnailURL)
+            HistoryImageView(url: thumbnailURL, contentMode: .fill)
                 .frame(width: 56, height: 42)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .overlay {
@@ -491,11 +496,9 @@ struct CapturePreview: View {
 
             Divider()
 
-            if let image = NSImage(contentsOf: storage.absoluteURL(for: item.filePath)) {
+            if HistoryImageCache.shared.image(for: storage.absoluteURL(for: item.filePath)) != nil {
                 GeometryReader { proxy in
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
+                    HistoryImageView(url: storage.absoluteURL(for: item.filePath), contentMode: .fit)
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .background(.black.opacity(0.04))
                 }
@@ -518,14 +521,15 @@ struct CapturePreview: View {
     }
 }
 
-struct ThumbnailView: View {
+struct HistoryImageView: View {
     let url: URL
+    let contentMode: ContentMode
 
     var body: some View {
-        if let image = NSImage(contentsOf: url) {
+        if let image = HistoryImageCache.shared.image(for: url) {
             Image(nsImage: image)
                 .resizable()
-                .scaledToFill()
+                .aspectRatio(contentMode: contentMode)
         } else {
             ZStack {
                 Rectangle().fill(.quaternary)
