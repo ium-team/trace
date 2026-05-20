@@ -110,22 +110,20 @@ struct HistoryView: View {
         } message: {
             Text("원본 이미지, 썸네일, 히스토리 항목이 함께 삭제됩니다.")
         }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    toggleSidebar()
+                } label: {
+                    Label("사이드바", systemImage: "sidebar.left")
+                }
+            }
+        }
         .frame(minWidth: 980, minHeight: 640)
     }
 
     private var historyCommandBar: some View {
-        HStack(spacing: 12) {
-            Button {
-                toggleSidebar()
-            } label: {
-                Label("사이드바", systemImage: "sidebar.left")
-                    .labelStyle(.iconOnly)
-            }
-            .help("사이드바")
-
-            Divider()
-                .frame(height: 28)
-
+        HStack(spacing: 0) {
             HStack(spacing: 8) {
                 Button {
                     togglePinnedForSelection()
