@@ -86,7 +86,6 @@ YYYY-MM-DD_HH-mm-ss-3.png
   "copyToClipboardByDefault": true,
   "basicCaptureShortcut": "command+shift+2",
   "deliveryCaptureShortcut": "command+shift+3",
-  "defaultCaptureMode": "copyOnly",
   "basicCaptureAction": "copyAndSave",
   "deliveryCaptureAction": "copySaveAndDeliver",
   "deliveryTargetMode": "chooseEachTime",

@@ -333,7 +333,6 @@ struct TraceSettings: Codable, Equatable {
     var copyToClipboardByDefault: Bool
     var basicCaptureShortcut: String
     var deliveryCaptureShortcut: String
-    var defaultCaptureMode: CaptureMode
     var basicCaptureAction: BasicCaptureAction
     var deliveryCaptureAction: DeliveryCaptureAction
     var deliveryTargetMode: DeliveryTargetMode
@@ -357,7 +356,6 @@ struct TraceSettings: Codable, Equatable {
         copyToClipboardByDefault: true,
         basicCaptureShortcut: "command+shift+2",
         deliveryCaptureShortcut: "command+shift+3",
-        defaultCaptureMode: .copyOnly,
         basicCaptureAction: .copyAndSave,
         deliveryCaptureAction: .copySaveAndDeliver,
         deliveryTargetMode: .chooseEachTime,
@@ -375,7 +373,6 @@ struct TraceSettings: Codable, Equatable {
         case copyToClipboardByDefault
         case basicCaptureShortcut
         case deliveryCaptureShortcut
-        case defaultCaptureMode
         case basicCaptureAction
         case deliveryCaptureAction
         case deliveryTargetMode
@@ -393,7 +390,6 @@ struct TraceSettings: Codable, Equatable {
         copyToClipboardByDefault: Bool = true,
         basicCaptureShortcut: String? = nil,
         deliveryCaptureShortcut: String = "command+shift+3",
-        defaultCaptureMode: CaptureMode,
         basicCaptureAction: BasicCaptureAction = .copyAndSave,
         deliveryCaptureAction: DeliveryCaptureAction = .copySaveAndDeliver,
         deliveryTargetMode: DeliveryTargetMode = .chooseEachTime,
@@ -409,7 +405,6 @@ struct TraceSettings: Codable, Equatable {
         self.copyToClipboardByDefault = copyToClipboardByDefault
         self.basicCaptureShortcut = basicCaptureShortcut ?? globalShortcut
         self.deliveryCaptureShortcut = deliveryCaptureShortcut
-        self.defaultCaptureMode = defaultCaptureMode
         self.basicCaptureAction = basicCaptureAction
         self.deliveryCaptureAction = deliveryCaptureAction
         self.deliveryTargetMode = deliveryTargetMode
@@ -428,7 +423,6 @@ struct TraceSettings: Codable, Equatable {
         copyToClipboardByDefault = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboardByDefault) ?? true
         basicCaptureShortcut = try container.decodeIfPresent(String.self, forKey: .basicCaptureShortcut) ?? globalShortcut
         deliveryCaptureShortcut = try container.decodeIfPresent(String.self, forKey: .deliveryCaptureShortcut) ?? "command+shift+3"
-        defaultCaptureMode = try container.decode(CaptureMode.self, forKey: .defaultCaptureMode)
         basicCaptureAction = try container.decodeIfPresent(BasicCaptureAction.self, forKey: .basicCaptureAction) ?? .copyAndSave
         deliveryCaptureAction = try container.decodeIfPresent(DeliveryCaptureAction.self, forKey: .deliveryCaptureAction) ?? .copySaveAndDeliver
         deliveryTargetMode = try container.decodeIfPresent(DeliveryTargetMode.self, forKey: .deliveryTargetMode) ?? .chooseEachTime

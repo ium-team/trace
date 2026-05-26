@@ -56,7 +56,6 @@ final class CaptureStorageTests: XCTestCase {
         let settings = TraceSettings(
             saveDirectory: temporaryRoot.path,
             globalShortcut: "command+shift+2",
-            defaultCaptureMode: .copyOnly,
             fileNameRule: .sequence,
             sequenceStyle: .numeric
         )
@@ -141,8 +140,7 @@ final class CaptureStorageTests: XCTestCase {
         let secondRoot = temporaryRoot.appendingPathComponent("Second", isDirectory: true)
         let settings = TraceSettings(
             saveDirectory: firstRoot.path,
-            globalShortcut: "command+shift+2",
-            defaultCaptureMode: .copyOnly
+            globalShortcut: "command+shift+2"
         )
         let store = SettingsStore(settings: settings, userDefaults: testDefaults)
         let storage = CaptureStorage(settingsStore: store)
@@ -170,8 +168,7 @@ final class CaptureStorageTests: XCTestCase {
         let selectedRoot = temporaryRoot.appendingPathComponent("Selected", isDirectory: true)
         let settings = TraceSettings(
             saveDirectory: selectedRoot.path,
-            globalShortcut: "command+shift+2",
-            defaultCaptureMode: .copyOnly
+            globalShortcut: "command+shift+2"
         )
         let store = SettingsStore(settings: settings, userDefaults: testDefaults)
 
@@ -184,8 +181,7 @@ final class CaptureStorageTests: XCTestCase {
     private func makeStorage() -> CaptureStorage {
         let settings = TraceSettings(
             saveDirectory: temporaryRoot.path,
-            globalShortcut: "command+shift+2",
-            defaultCaptureMode: .copyOnly
+            globalShortcut: "command+shift+2"
         )
         let store = SettingsStore(settings: settings, userDefaults: testDefaults)
         return CaptureStorage(settingsStore: store)

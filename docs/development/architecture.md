@@ -105,7 +105,6 @@ TraceApp
 - 저장 위치 설정
 - 기본 캡처 전역 단축키 설정
 - 앱으로 전달 캡처 전역 단축키 설정
-- 기본 캡처 방식 설정
 - 기본 캡처 완료 후 동작 설정
 - 앱으로 전달 캡처 완료 후 동작 설정
 - macOS 알림 설정으로 이동
@@ -168,7 +167,6 @@ accessibilityElement
 saveDirectory
 basicCaptureShortcut
 deliveryCaptureShortcut
-defaultCaptureMode
 basicCaptureAction
 deliveryCaptureAction
 deliveryTargetMode

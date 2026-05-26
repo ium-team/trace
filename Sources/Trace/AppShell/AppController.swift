@@ -40,9 +40,13 @@ final class AppController {
 
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
-        let startCaptureItem = NSMenuItem(title: "캡처 시작", action: #selector(startCaptureFromMenu), keyEquivalent: "")
-        startCaptureItem.target = self
-        menu.addItem(startCaptureItem)
+        let startBasicCaptureItem = NSMenuItem(title: "기본 캡처 시작", action: #selector(startBasicCaptureFromMenu), keyEquivalent: "")
+        startBasicCaptureItem.target = self
+        menu.addItem(startBasicCaptureItem)
+
+        let startDeliveryCaptureItem = NSMenuItem(title: "앱으로 전달 캡처 시작", action: #selector(startDeliveryCaptureFromMenu), keyEquivalent: "")
+        startDeliveryCaptureItem.target = self
+        menu.addItem(startDeliveryCaptureItem)
 
         let cancelCaptureItem = NSMenuItem(title: "캡처 취소", action: #selector(cancelCaptureFromMenu), keyEquivalent: "")
         cancelCaptureItem.target = self
@@ -120,10 +124,6 @@ final class AppController {
 
         menu.addItem(.separator())
 
-        let defaultModeItem = NSMenuItem(title: "기본 캡처 방식", action: nil, keyEquivalent: "")
-        defaultModeItem.submenu = makeDefaultModeMenu()
-        menu.addItem(defaultModeItem)
-
         let basicActionItem = NSMenuItem(title: "기본 캡처 완료 후 동작", action: nil, keyEquivalent: "")
         basicActionItem.submenu = makeBasicActionMenu()
         menu.addItem(basicActionItem)
@@ -137,17 +137,6 @@ final class AppController {
         menu.addItem(deliveryTargetItem)
 
         updateQuickSettingsMenuState(menu)
-        return menu
-    }
-
-    private func makeDefaultModeMenu() -> NSMenu {
-        let menu = NSMenu()
-        for mode in CaptureMode.allCases {
-            let item = NSMenuItem(title: mode.title, action: #selector(selectDefaultCaptureModeFromMenu(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = mode.rawValue
-            menu.addItem(item)
-        }
         return menu
     }
 
@@ -201,10 +190,6 @@ final class AppController {
             autoCopyItem.state = settings.copyToClipboardByDefault ? .on : .off
         }
 
-        if let defaultModeMenu = menu.item(withTitle: "기본 캡처 방식")?.submenu {
-            updateSubmenuState(defaultModeMenu, selectedRawValue: settings.defaultCaptureMode.rawValue)
-        }
-
         if let basicActionMenu = menu.item(withTitle: "기본 캡처 완료 후 동작")?.submenu {
             updateSubmenuState(basicActionMenu, selectedRawValue: settings.basicCaptureAction.rawValue)
         }
@@ -228,18 +213,6 @@ final class AppController {
     @objc private func toggleAutoCopyFromMenu() {
         var updated = settingsStore.settings
         updated.copyToClipboardByDefault.toggle()
-        settingsStore.update(updated)
-    }
-
-    @objc private func selectDefaultCaptureModeFromMenu(_ sender: NSMenuItem) {
-        guard let rawValue = sender.representedObject as? String,
-              let mode = CaptureMode(rawValue: rawValue)
-        else {
-            return
-        }
-
-        var updated = settingsStore.settings
-        updated.defaultCaptureMode = mode
         settingsStore.update(updated)
     }
 
@@ -279,9 +252,12 @@ final class AppController {
         settingsStore.update(updated)
     }
 
-    @objc private func startCaptureFromMenu() {
-        let defaultPlan = settingsStore.settings.defaultCaptureMode == .deliverToApp ? CapturePlan.areaDelivery : .areaCopy
-        startInteractiveCapture(defaultPlan: defaultPlan)
+    @objc private func startBasicCaptureFromMenu() {
+        startInteractiveCapture(defaultPlan: .areaCopy)
+    }
+
+    @objc private func startDeliveryCaptureFromMenu() {
+        startInteractiveCapture(defaultPlan: .areaDelivery)
     }
 
     @objc private func cancelCaptureFromMenu() {
@@ -296,8 +272,8 @@ final class AppController {
         openSettings()
     }
 
-    func startInteractiveCapture(defaultPlan: CapturePlan? = nil) {
-        let plan = defaultPlan ?? CapturePlan(mode: settingsStore.settings.defaultCaptureMode, scope: .area)
+    func startInteractiveCapture(defaultPlan: CapturePlan) {
+        let plan = defaultPlan
         pendingRecentDeliveryDestination = currentExternalFrontmostApplication()
         guard PermissionService.hasScreenRecordingPermission else {
             requestScreenRecordingPermissionForCapture(defaultPlan: plan)
@@ -330,7 +306,11 @@ final class AppController {
         case .success(let interactiveResult):
             await handleCaptureResult(.success(interactiveResult.capture), mode: interactiveResult.plan.mode)
         case .failure(let error):
-            await handleCaptureResult(.failure(error), mode: settingsStore.settings.defaultCaptureMode)
+            pendingRecentDeliveryDestination = nil
+            if case TraceError.captureCancelled = error {
+                return
+            }
+            showError(error.localizedDescription)
         }
     }
 
