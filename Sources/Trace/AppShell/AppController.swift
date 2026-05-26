@@ -94,6 +94,10 @@ final class AppController {
             registerHotKeys()
         }
 
+        if previous?.saveDirectory != current.saveDirectory {
+            storage.reload()
+        }
+
         if previous?.fileNameRule != current.fileNameRule ||
             previous?.dateFileNameFormat != current.dateFileNameFormat ||
             previous?.sequenceStyle != current.sequenceStyle {

@@ -4,17 +4,22 @@ import Observation
 @MainActor
 @Observable
 final class SettingsStore {
+    private static let selectedSaveDirectoryKey = "Trace.selectedSaveDirectory"
+
     private let fileManager: FileManager
+    private let userDefaults: UserDefaults
     private(set) var settings: TraceSettings
     @ObservationIgnored var onUpdate: ((TraceSettings) -> Void)?
 
-    init(fileManager: FileManager = .default) {
+    init(fileManager: FileManager = .default, userDefaults: UserDefaults = .standard) {
         self.fileManager = fileManager
-        self.settings = Self.load(fileManager: fileManager)
+        self.userDefaults = userDefaults
+        self.settings = Self.load(fileManager: fileManager, userDefaults: userDefaults)
     }
 
-    init(settings: TraceSettings, fileManager: FileManager = .default) {
+    init(settings: TraceSettings, fileManager: FileManager = .default, userDefaults: UserDefaults = .standard) {
         self.fileManager = fileManager
+        self.userDefaults = userDefaults
         self.settings = settings
     }
 
@@ -35,27 +40,33 @@ final class SettingsStore {
             try fileManager.createDirectory(at: rootURL, withIntermediateDirectories: true)
             let data = try JSONEncoder.trace.encode(settings)
             try AtomicFileWriter.write(data, to: Self.settingsURL(rootURL: rootURL))
+            userDefaults.set(settings.saveDirectory, forKey: Self.selectedSaveDirectoryKey)
         } catch {
             NSLog("Trace settings save failed: \(error.localizedDescription)")
         }
     }
 
-    private static func load(fileManager: FileManager) -> TraceSettings {
+    private static func load(fileManager: FileManager, userDefaults: UserDefaults) -> TraceSettings {
         let defaultRoot = URL(fileURLWithPath: TraceSettings.defaultSaveDirectory)
-        let defaultURL = settingsURL(rootURL: defaultRoot)
+        let selectedRoot = userDefaults.string(forKey: selectedSaveDirectoryKey)
+            .map { URL(fileURLWithPath: $0).standardizedFileURL }
+        let candidateURLs = [selectedRoot, defaultRoot]
+            .compactMap { $0 }
+            .map { settingsURL(rootURL: $0) }
 
-        guard let data = try? Data(contentsOf: defaultURL),
-              let settings = try? JSONDecoder.trace.decode(TraceSettings.self, from: data)
-        else {
-            let defaults = TraceSettings.defaults
-            try? fileManager.createDirectory(at: defaultRoot, withIntermediateDirectories: true)
-            if let data = try? JSONEncoder.trace.encode(defaults) {
-                try? AtomicFileWriter.write(data, to: defaultURL)
+        for url in candidateURLs {
+            if let data = try? Data(contentsOf: url),
+               let settings = try? JSONDecoder.trace.decode(TraceSettings.self, from: data) {
+                return settings
             }
-            return defaults
         }
 
-        return settings
+        let defaults = TraceSettings.defaults
+        try? fileManager.createDirectory(at: defaultRoot, withIntermediateDirectories: true)
+        if let data = try? JSONEncoder.trace.encode(defaults) {
+            try? AtomicFileWriter.write(data, to: settingsURL(rootURL: defaultRoot))
+        }
+        return defaults
     }
 
     private static func settingsURL(rootURL: URL) -> URL {

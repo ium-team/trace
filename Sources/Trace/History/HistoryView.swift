@@ -129,53 +129,48 @@ struct HistoryView: View {
                     toggleSidebar()
                 } label: {
                     Label("사이드바", systemImage: "sidebar.left")
+                        .labelStyle(.iconOnly)
+                        .help("사이드바")
                 }
+                .accessibilityLabel("사이드바")
+                .help("사이드바")
             }
             ToolbarItemGroup(placement: .automatic) {
-                Button {
-                    togglePinnedForSelection()
-                } label: {
-                    Label(selectedItems.allSatisfy(\.isPinned) ? "고정 해제" : "고정", systemImage: selectedItems.allSatisfy(\.isPinned) ? "pin.slash" : "pin")
-                        .labelStyle(.iconOnly)
-                }
-                .disabled(selectedCount == 0)
-                .help(selectedItems.allSatisfy(\.isPinned) ? "고정 해제" : "고정")
+                HistoryToolbarButton(
+                    title: selectedItems.allSatisfy(\.isPinned) ? "고정 해제" : "고정",
+                    systemImage: selectedItems.allSatisfy(\.isPinned) ? "pin.slash" : "pin",
+                    isDisabled: selectedCount == 0,
+                    action: togglePinnedForSelection
+                )
 
-                Button {
-                    toggleBookmarkedForSelection()
-                } label: {
-                    Label(selectedItems.allSatisfy(\.isBookmarked) ? "북마크 해제" : "북마크", systemImage: selectedItems.allSatisfy(\.isBookmarked) ? "bookmark.slash" : "bookmark")
-                        .labelStyle(.iconOnly)
-                }
-                .disabled(selectedCount == 0)
-                .help(selectedItems.allSatisfy(\.isBookmarked) ? "북마크 해제" : "북마크")
+                HistoryToolbarButton(
+                    title: selectedItems.allSatisfy(\.isBookmarked) ? "북마크 해제" : "북마크",
+                    systemImage: selectedItems.allSatisfy(\.isBookmarked) ? "bookmark.slash" : "bookmark",
+                    isDisabled: selectedCount == 0,
+                    action: toggleBookmarkedForSelection
+                )
 
-                Button {
-                    copyPrimarySelection()
-                } label: {
-                    Label("복사", systemImage: "doc.on.clipboard")
-                        .labelStyle(.iconOnly)
-                }
-                .disabled(selectedCount == 0)
-                .help("복사")
+                HistoryToolbarButton(
+                    title: "복사",
+                    systemImage: "doc.on.clipboard",
+                    isDisabled: selectedCount == 0,
+                    action: copyPrimarySelection
+                )
 
-                Button {
-                    revealPrimarySelection()
-                } label: {
-                    Label("Finder", systemImage: "finder")
-                        .labelStyle(.iconOnly)
-                }
-                .disabled(selectedCount == 0)
-                .help("Finder")
+                HistoryToolbarButton(
+                    title: "Finder",
+                    systemImage: "finder",
+                    isDisabled: selectedCount == 0,
+                    action: revealPrimarySelection
+                )
 
-                Button(role: .destructive) {
-                    isShowingDeleteConfirmation = true
-                } label: {
-                    Label("삭제", systemImage: "trash")
-                        .labelStyle(.iconOnly)
-                }
-                .disabled(selectedCount == 0)
-                .help("삭제")
+                HistoryToolbarButton(
+                    title: "삭제",
+                    systemImage: "trash",
+                    isDisabled: selectedCount == 0,
+                    role: .destructive,
+                    action: { isShowingDeleteConfirmation = true }
+                )
             }
         }
         .controlSize(.large)
@@ -400,6 +395,25 @@ struct HistoryView: View {
         } catch {
             message = error.localizedDescription
         }
+    }
+}
+
+private struct HistoryToolbarButton: View {
+    let title: String
+    let systemImage: String
+    let isDisabled: Bool
+    var role: ButtonRole?
+    let action: () -> Void
+
+    var body: some View {
+        Button(role: role, action: action) {
+            Label(title, systemImage: systemImage)
+                .labelStyle(.iconOnly)
+                .help(title)
+        }
+        .disabled(isDisabled)
+        .accessibilityLabel(title)
+        .help(title)
     }
 }
 

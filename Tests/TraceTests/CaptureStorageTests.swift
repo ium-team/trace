@@ -5,17 +5,24 @@ import XCTest
 @MainActor
 final class CaptureStorageTests: XCTestCase {
     private var temporaryRoot: URL!
+    private var defaultsSuiteName: String!
+    private var testDefaults: UserDefaults!
 
     override func setUp() async throws {
         try await super.setUp()
         temporaryRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("TraceTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: temporaryRoot, withIntermediateDirectories: true)
+        defaultsSuiteName = "TraceTests-\(UUID().uuidString)"
+        testDefaults = UserDefaults(suiteName: defaultsSuiteName)!
     }
 
     override func tearDown() async throws {
         if let temporaryRoot {
             try? FileManager.default.removeItem(at: temporaryRoot)
+        }
+        if let defaultsSuiteName {
+            UserDefaults.standard.removePersistentDomain(forName: defaultsSuiteName)
         }
         try await super.tearDown()
     }
@@ -129,13 +136,58 @@ final class CaptureStorageTests: XCTestCase {
         XCTAssertEqual(storage.pinnedCaptures.map(\.id), [saved.item.id])
     }
 
+    func testSwitchingSaveDirectoryLoadsHistoryForSelectedRootOnly() throws {
+        let firstRoot = temporaryRoot.appendingPathComponent("First", isDirectory: true)
+        let secondRoot = temporaryRoot.appendingPathComponent("Second", isDirectory: true)
+        let settings = TraceSettings(
+            saveDirectory: firstRoot.path,
+            globalShortcut: "command+shift+2",
+            defaultCaptureMode: .copyOnly
+        )
+        let store = SettingsStore(settings: settings, userDefaults: testDefaults)
+        let storage = CaptureStorage(settingsStore: store)
+        let first = try storage.save(image: testImage(), mode: .copyOnly)
+
+        var movedSettings = store.settings
+        movedSettings.saveDirectory = secondRoot.path
+        store.update(movedSettings)
+        storage.reload()
+
+        XCTAssertTrue(storage.captures.isEmpty)
+
+        let second = try storage.save(image: testImage(), mode: .copyOnly)
+        XCTAssertEqual(storage.captures.map(\.id), [second.item.id])
+
+        movedSettings.saveDirectory = firstRoot.path
+        store.update(movedSettings)
+        storage.reload()
+
+        XCTAssertEqual(storage.captures.map(\.id), [first.item.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: second.fileURL.path))
+    }
+
+    func testSelectedSaveDirectoryIsRestoredBySettingsStore() {
+        let selectedRoot = temporaryRoot.appendingPathComponent("Selected", isDirectory: true)
+        let settings = TraceSettings(
+            saveDirectory: selectedRoot.path,
+            globalShortcut: "command+shift+2",
+            defaultCaptureMode: .copyOnly
+        )
+        let store = SettingsStore(settings: settings, userDefaults: testDefaults)
+
+        store.save()
+
+        let restoredStore = SettingsStore(userDefaults: testDefaults)
+        XCTAssertEqual(restoredStore.rootURL, selectedRoot.standardizedFileURL)
+    }
+
     private func makeStorage() -> CaptureStorage {
         let settings = TraceSettings(
             saveDirectory: temporaryRoot.path,
             globalShortcut: "command+shift+2",
             defaultCaptureMode: .copyOnly
         )
-        let store = SettingsStore(settings: settings)
+        let store = SettingsStore(settings: settings, userDefaults: testDefaults)
         return CaptureStorage(settingsStore: store)
     }
 
